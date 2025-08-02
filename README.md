@@ -1,217 +1,147 @@
-# Video Translate App
+# Video Chat App - WebRTC
 
-A real-time video translation application that allows users to communicate across different languages using speech-to-text, translation, and text-to-speech technologies.
+Uma aplicação simples de videochamada entre duas pessoas usando WebRTC e Socket.IO.
 
-## Features
+## 🚀 Funcionalidades
 
-- **Real-time Audio Translation**: Speak in your native language and have it translated to other users' preferred languages
-- **Multi-language Support**: Supports multiple languages including English, Spanish, Portuguese, French, German, and more
-- **Room-based Communication**: Create or join rooms for group conversations
-- **WebRTC Integration**: Uses WebRTC for real-time audio/video streaming
-- **Web Speech API**: Utiliza a API nativa do navegador para transcrição e síntese de voz
-- **LibreTranslate**: Serviço gratuito de tradução para converter texto entre idiomas
-- **Modern UI**: Beautiful, responsive interface built with React and TypeScript
+- ✅ Videochamada ponto a ponto entre duas pessoas
+- ✅ Acesso à câmera e microfone
+- ✅ Entrada em sala com Room ID
+- ✅ Conexão WebRTC com Socket.IO
+- ✅ Troca de ofertas, respostas e ICE candidates
+- ✅ Interface responsiva e moderna
 
-## Tech Stack
-
-### Backend
-- **Node.js** with **Express.js**
-- **TypeScript** for type safety
-- **Socket.IO** for real-time communication
-- **PeerJS** para comunicação peer-to-peer
-- **LibreTranslate** para tradução de texto
-- **Supabase** para autenticação e banco de dados
-- **Vercel Serverless Functions** para hospedagem do backend
+## 🛠️ Tecnologias
 
 ### Frontend
-- **React** with **TypeScript**
-- **Socket.IO Client** for real-time communication
-- **PeerJS** for WebRTC audio/video streaming
-- **Web Speech API** para transcrição e síntese de voz
-- **Modern CSS** with gradients and animations
-- **Vercel** para hospedagem do frontend
+- React 18 + TypeScript
+- Socket.IO Client
+- WebRTC API
+- CSS3 com design responsivo
 
-## Prerequisites
+### Backend
+- Node.js + Express
+- Socket.IO Server
+- TypeScript
+- CORS configurado para Vercel
 
-- Node.js (v16 or higher)
-- npm or yarn
-- Conta no Vercel (para deploy)
-- Conta no Supabase (para autenticação e banco de dados)
+## 📦 Instalação e Execução
 
-## Installation
-
-1. Clone the repository:
+### Backend
 ```bash
-git clone <repository-url>
-cd VideoTranslateApp
-```
-
-2. Install all dependencies:
-```bash
-npm run install:all
-```
-
-3. Set up environment variables:
-```bash
-# Na raiz do projeto, crie um arquivo .env para o backend
-cd api
-cp .env.example .env
-# Edite o arquivo .env com suas configurações
-
-# Na pasta frontend, crie um arquivo .env.local
-cd ../frontend
-cp .env.example .env.local
-# Edite o arquivo .env.local com suas configurações
-```
-
-## Deploy
-
-Este projeto está configurado para deploy no Vercel. Você pode fazer o deploy de duas maneiras:
-
-### Usando o script de deploy
-
-```bash
-# Na raiz do projeto
-./deploy-vercel.sh
-```
-
-### Manualmente
-
-```bash
-# Instalar o Vercel CLI
-npm install -g vercel
-
-# Fazer login no Vercel
-vercel login
-
-# Deploy de produção
-npm run deploy
-
-# OU para deploy de desenvolvimento
-npm run deploy:dev
-```
-
-Para mais informações sobre o deploy, consulte o arquivo [VERCEL-DEPLOY.md](VERCEL-DEPLOY.md).cp .env.example .env
-```
-
-Edit the `.env` file and add your OpenAI API key:
-```
-OPENAI_API_KEY=your_openai_api_key_here
-```
-
-## Running the Application
-
-### Development Mode
-Run both backend and frontend simultaneously:
-```bash
+cd backend
+npm install
 npm run dev
 ```
+O backend rodará em `http://localhost:3001`
 
-This will start:
-- Backend server on `http://localhost:3001`
-- Frontend development server on `http://localhost:3000`
-
-### Individual Services
-
-Run backend only:
+### Frontend
 ```bash
-npm run dev:backend
+cd frontend
+npm install
+npm start
+```
+O frontend rodará em `http://localhost:3000`
+
+## 🎯 Como Usar
+
+1. Acesse `http://localhost:3000`
+2. Digite seu nome
+3. Digite um Room ID (ex: "sala123")
+4. Clique em "Entrar na Sala"
+5. Compartilhe o mesmo Room ID com outra pessoa
+6. Quando a segunda pessoa entrar, a videochamada iniciará automaticamente
+
+## 🌐 Deploy
+
+### Frontend (Vercel)
+- Hospedado em: `https://video-translate-app.vercel.app`
+- Variável de ambiente: `REACT_APP_SOCKET_URL`
+
+### Backend (Render)
+- Hospedado em: `https://video-translate-app.onrender.com`
+- CORS configurado para aceitar o domínio do Vercel
+
+## 🔧 Configuração
+
+### Variáveis de Ambiente
+
+**Frontend (.env)**
+```
+REACT_APP_SOCKET_URL=https://video-translate-app.onrender.com
 ```
 
-Run frontend only:
-```bash
-npm run dev:frontend
+**Backend (.env)**
+```
+NODE_ENV=development
+PORT=3001
 ```
 
-## Usage
-
-1. **Onboarding**: When you first visit the app, you'll be guided through a setup process:
-   - Enter your name
-   - Select your preferred language
-
-2. **Room Management**:
-   - Create a new room or join an existing one
-   - See other users in the room and their language preferences
-
-3. **Real-time Translation**:
-   - Click "Start Recording" to begin speaking
-   - Your speech will be transcribed and translated for other users
-   - Other users will hear the translated audio in their preferred language
-
-## API Endpoints
-
-### Rooms
-- `GET /api/rooms` - Get all available rooms
-- `POST /api/rooms` - Create a new room
-- `GET /api/rooms/:roomId` - Get specific room details
-- `POST /api/rooms/:roomId/join` - Join a room
-- `POST /api/rooms/:roomId/leave` - Leave a room
-- `DELETE /api/rooms/:roomId` - Delete a room
-
-### Onboarding
-- `GET /api/onboarding/languages` - Get available languages
-- `POST /api/onboarding/users` - Create a new user
-- `GET /api/onboarding/users/:userId` - Get user details
-- `PUT /api/onboarding/users/:userId` - Update user
-- `DELETE /api/onboarding/users/:userId` - Delete user
-
-### Socket.IO Events
-- `join-room` - Join a room
-- `leave-room` - Leave a room
-- `audio-chunk` - Send audio data for translation
-- `translated-audio` - Receive translated audio
-- `user-joined` - User joined the room
-- `user-left` - User left the room
-
-## Testing
-
-Run the test suite:
-```bash
-npm test
-```
-
-## Building for Production
-
-Build both backend and frontend:
-```bash
-npm run build
-```
-
-## Project Structure
+## 🏗️ Estrutura do Projeto
 
 ```
-VideoTranslateApp/
-├── backend/
-│   ├── src/
-│   │   ├── index.ts          # Main server file
-│   │   ├── routes/           # API routes
-│   │   ├── services/         # Business logic
-│   │   └── types/            # TypeScript types
-│   ├── package.json
-│   └── tsconfig.json
+video-translate-app/
 ├── frontend/
 │   ├── src/
-│   │   ├── components/       # React components
-│   │   ├── types/            # TypeScript types
-│   │   ├── App.tsx           # Main app component
-│   │   └── index.tsx         # Entry point
-│   ├── package.json
-│   └── tsconfig.json
-└── package.json              # Root package.json
+│   │   ├── components/
+│   │   │   ├── VideoRoom.tsx
+│   │   │   └── VideoRoom.css
+│   │   ├── types/
+│   │   │   └── index.ts
+│   │   ├── App.tsx
+│   │   └── config.ts
+│   └── package.json
+├── backend/
+│   ├── src/
+│   │   └── index.ts
+│   └── package.json
+└── README.md
 ```
 
-## Contributing
+## 🔍 Eventos Socket.IO
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+### Cliente → Servidor
+- `join-room`: Entrar em uma sala
+- `leave-room`: Sair da sala
+- `offer`: Enviar oferta WebRTC
+- `answer`: Enviar resposta WebRTC
+- `ice-candidate`: Enviar candidato ICE
 
-## License
+### Servidor → Cliente
+- `room-users`: Lista de usuários na sala
+- `user-joined`: Novo usuário entrou
+- `user-left`: Usuário saiu
+- `offer`: Receber oferta WebRTC
+- `answer`: Receber resposta WebRTC
+- `ice-candidate`: Receber candidato ICE
 
-This project is licensed under the MIT License.
+## 🎥 Servidores STUN
 
-## Support
+O projeto usa servidores STUN públicos do Google:
+- `stun:stun.l.google.com:19302`
+- `stun:stun1.l.google.com:19302`
 
-For support, please open an issue in the GitHub repository.
+## 📝 Próximos Passos
+
+Após confirmar que a videochamada básica está funcionando, podemos adicionar:
+- Sistema de onboarding
+- Integração com IA para tradução
+- Suporte a mais de 2 usuários
+- Gravação de chamadas
+- Chat de texto
+
+## 🐛 Troubleshooting
+
+### Problemas Comuns
+
+1. **Câmera/microfone não funcionam**
+   - Verifique as permissões do navegador
+   - Use HTTPS em produção
+
+2. **Conexão WebRTC falha**
+   - Verifique se ambos os usuários estão na mesma sala
+   - Confirme se o backend está rodando
+
+3. **Socket.IO não conecta**
+   - Verifique a URL do backend
+   - Confirme se o CORS está configurado corretamente

@@ -1,423 +1,211 @@
-import express from "express";
-import cors from "cors";
-import { createServer } from "http";
-import { Server } from "socket.io";
-import dotenv from "dotenv";
-import { SupabaseService } from "./services/supabaseService";
-import { TranslationService } from "./services/translationService";
-import { TranscriptionService } from "./services/transcriptionService";
-import { TTSService } from "./services/ttsService";
-import { AudioChunk } from "./types";
-import peerServer from "./peerServer";
-import { logger } from "./utils/logger";
+import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import cors from 'cors';
 
-dotenv.config();
+// WebRTC types
+interface RTCSessionDescriptionInit {
+  type: 'offer' | 'answer';
+  sdp: string;
+}
+
+interface RTCIceCandidateInit {
+  candidate: string;
+  sdpMLineIndex?: number | null;
+  sdpMid?: string | null;
+}
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: ["https://video-translate-app.vercel.app", "http://localhost:3000"],
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
 
-const PORT = process.env.PORT || 3001;
-
-// Middleware
-app.use(cors({
-  origin: ["https://video-translate-app.vercel.app", "http://localhost:3000"],
+// CORS configuration
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'https://video-translate-app.vercel.app',
+    'https://video-translate-app-git-main-brunomagalhaes-projects.vercel.app',
+    'https://video-translate-app-brunomagalhaes-projects.vercel.app'
+  ],
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
 
-// Services
-let supabaseService: SupabaseService;
-try {
-  supabaseService = new SupabaseService();
-  logger.info("Supabase connected successfully");
-} catch (error) {
-  logger.warn("Supabase connection failed, using fallback mode");
-  supabaseService = null as any;
-}
+app.use(cors(corsOptions));
+app.use(express.json());
 
-const translationService = new TranslationService();
-const transcriptionService = new TranscriptionService();
-const ttsService = new TTSService();
-
-// Health check
-app.get("/health", (req, res) => {
-  res.json({ 
-    status: "OK", 
-    message: "Backend is running with onboarding routes!",
-    supabase: supabaseService ? "connected" : "fallback mode",
-    services: {
-      translation: translationService.getAvailableProviders(),
-      transcription: transcriptionService.getAvailableProviders(),
-      tts: ttsService.getAvailableProviders()
-    }
-  });
+// Socket.IO configuration
+const io = new Server(server, {
+  cors: corsOptions
 });
 
-// Auth routes
-app.post("/api/auth/magic-link", async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (supabaseService) {
-      await supabaseService.sendMagicLink(email);
-    }
-    res.json({ message: "Magic link sent successfully" });
-  } catch (error) {
-    logger.error("Magic link error:", error);
-    res.status(500).json({ error: "Failed to send magic link" });
-  }
-});
+// In-memory storage for rooms and users
+const rooms = new Map<string, Set<string>>();
+const userSockets = new Map<string, string>(); // userId -> socketId
+const socketUsers = new Map<string, { id: string; name: string; roomId?: string }>(); // socketId -> user
 
-app.post("/api/auth/signout", async (req, res) => {
-  try {
-    if (supabaseService) {
-      await supabaseService.signOut();
-    }
-    res.json({ message: "Signed out successfully" });
-  } catch (error) {
-    logger.error("Sign out error:", error);
-    res.status(500).json({ error: "Failed to sign out" });
-  }
+// Basic health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-
-// User routes
-app.post("/api/users", async (req, res) => {
-  try {
-    const { email, name, language } = req.body;
-    if (supabaseService) {
-      const user = await supabaseService.createUser({ email, name, language });
-      res.json({ user });
-    } else {
-      // Fallback: create user in memory
-      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const user = { id: userId, email, name, language, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-      res.json({ user });
-    }
-  } catch (error) {
-    logger.error("Create user error:", error);
-    res.status(500).json({ error: "Failed to create user" });
-  }
-});
-
-app.get("/api/users/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (supabaseService) {
-      const user = await supabaseService.getUserById(id);
-      res.json({ user });
-    } else {
-      res.status(404).json({ error: "User not found (fallback mode)" });
-    }
-  } catch (error) {
-    logger.error("Get user error:", error);
-    res.status(500).json({ error: "Failed to get user" });
-  }
-});
-
-// Room routes
-app.post("/api/rooms", async (req, res) => {
-  try {
-    const { name, creatorId } = req.body;
-    if (supabaseService) {
-      const room = await supabaseService.createRoom({ name, creator_id: creatorId });
-      res.json({ room });
-    } else {
-      // Fallback: create room in memory
-      const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const room = { id: roomId, name, creator_id: creatorId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-      res.json({ room });
-    }
-  } catch (error) {
-    logger.error("Create room error:", error);
-    res.status(500).json({ error: "Failed to create room" });
-  }
-});
-
-app.get("/api/rooms", async (req, res) => {
-  try {
-    if (supabaseService) {
-      const rooms = await supabaseService.getRooms();
-      res.json({ rooms });
-    } else {
-      res.json({ rooms: [] });
-    }
-  } catch (error) {
-    logger.error("Get rooms error:", error);
-    res.status(500).json({ error: "Failed to get rooms" });
-  }
-});
-
-app.get("/api/rooms/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (supabaseService) {
-      const room = await supabaseService.getRoomById(id);
-      res.json({ room });
-    } else {
-      res.status(404).json({ error: "Room not found (fallback mode)" });
-    }
-  } catch (error) {
-    logger.error("Get room error:", error);
-    res.status(500).json({ error: "Failed to get room" });
-  }
-});
-
-app.post("/api/rooms/:id/join", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { userId } = req.body;
-    if (supabaseService) {
-      await supabaseService.joinRoom(id, userId);
-    }
-    res.json({ message: "Joined room successfully" });
-  } catch (error) {
-    logger.error("Join room error:", error);
-    res.status(500).json({ error: "Failed to join room" });
-  }
-});
-
-app.post("/api/rooms/:id/leave", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { userId } = req.body;
-    if (supabaseService) {
-      await supabaseService.leaveRoom(id, userId);
-    }
-    res.json({ message: "Left room successfully" });
-  } catch (error) {
-    logger.error("Leave room error:", error);
-    res.status(500).json({ error: "Failed to leave room" });
-  }
-});
-
-// Onboarding routes
-app.get("/api/onboarding/languages", (req, res) => {
-  const languages = [
-    { code: "pt-BR", name: "Português (Brasil)" },
-    { code: "en-US", name: "English (United States)" },
-    { code: "es-ES", name: "Español (España)" },
-    { code: "fr-FR", name: "Français (France)" },
-    { code: "de-DE", name: "Deutsch (Deutschland)" },
-    { code: "it-IT", name: "Italiano (Italia)" },
-    { code: "ja-JP", name: "日本語 (日本)" },
-    { code: "ko-KR", name: "한국어 (대한민국)" },
-    { code: "zh-CN", name: "中文 (中国)" },
-    { code: "ru-RU", name: "Русский (Россия)" },
-    { code: "ar-SA", name: "العربية (السعودية)" },
-    { code: "hi-IN", name: "हिन्दी (भारत)" },
-  ];
-  
-  logger.info(`📋 Languages requested, returning ${languages.length} languages`);
-  res.json({ languages });
-});
-
-app.post("/api/onboarding/users", async (req, res) => {
-  try {
-    const { name, language, email } = req.body;
-    
-    // Validação básica
-    if (!name || !language) {
-      return res.status(400).json({ 
-        error: "Nome e idioma são obrigatórios",
-        details: { name: !!name, language: !!language }
-      });
-    }
-    
-    logger.info(`👤 Creating user: ${name} with language: ${language}`);
-    
-    if (supabaseService) {
-      const user = await supabaseService.createUser({ 
-        email: email || `${name.toLowerCase().replace(/\s+/g, '')}@demo.com`, 
-        name, 
-        language 
-      });
-      logger.info(`✅ User created in Supabase: ${user.id}`);
-      res.json({ user, success: true });
-    } else {
-      // Fallback: create user in memory
-      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const user = { 
-        id: userId, 
-        name, 
-        language, 
-        email: email || `${name.toLowerCase().replace(/\s+/g, '')}@demo.com`,
-        created_at: new Date().toISOString(), 
-        updated_at: new Date().toISOString() 
-      };
-      logger.info(`✅ User created in memory: ${userId}`);
-      res.json({ user, success: true });
-    }
-  } catch (error) {
-    logger.error("❌ Create user error:", error);
-    res.status(500).json({ 
-      error: "Falha ao criar usuário", 
-      details: error instanceof Error ? error.message : "Erro desconhecido"
-    });
-  }
-});
-
-// Map to store room users: roomId -> Set of socketIds
-const roomUsers = new Map<string, Set<string>>();
 
 // Socket.IO connection handling
-io.on("connection", (socket) => {
-  logger.info(`🔌 User connected: ${socket.id}`);
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
 
-  // Join a room
-  socket.on("join-room", async (data: { roomId: string; userId: string }) => {
-    try {
-      const { roomId, userId } = data;
-      
-      socket.join(roomId);
-      
-      // Initialize room if it doesn't exist
-      if (!roomUsers.has(roomId)) {
-        roomUsers.set(roomId, new Set());
+  // Handle joining a room
+  socket.on('join-room', (data: { roomId: string; user: { id: string; name: string } }) => {
+    const { roomId, user } = data;
+    
+    console.log(`User ${user.name} (${user.id}) joining room ${roomId}`);
+    
+    // Leave any previous room
+    if (socketUsers.has(socket.id)) {
+      const currentUser = socketUsers.get(socket.id)!;
+      if (currentUser.roomId) {
+        socket.leave(currentUser.roomId);
+        const currentRoom = rooms.get(currentUser.roomId);
+        if (currentRoom) {
+          currentRoom.delete(socket.id);
+          if (currentRoom.size === 0) {
+            rooms.delete(currentUser.roomId);
+          } else {
+            // Notify others in the previous room
+            socket.to(currentUser.roomId).emit('user-left', currentUser.id);
+          }
+        }
       }
-      
-      // Get existing users in the room
-      const existingUsers = Array.from(roomUsers.get(roomId) || []);
-      
-      // Add current user to room
-      roomUsers.get(roomId)!.add(socket.id);
-      
-      logger.info(`👥 User ${socket.id} joined room ${roomId}. Existing users: [${existingUsers.join(', ')}]`);
-      
-      // Send existing users to the new user
-      socket.emit("room-users", { users: existingUsers });
-      
-      // Notify existing users about the new user
-      socket.to(roomId).emit("user-joined", { socketId: socket.id, userId, roomId });
-      
-      // Send room state to the joining user
-      if (supabaseService) {
-        const room = await supabaseService.getRoomById(roomId);
-        const participants = await supabaseService.getRoomParticipants(roomId);
-        socket.emit("room-state", { room, participants });
-      } else {
-        socket.emit("room-state", { room: null, participants: [] });
-      }
-      
-      logger.info(`📊 Room ${roomId} now has ${roomUsers.get(roomId)!.size} users`);
-    } catch (error) {
-      logger.error("❌ Error joining room:", error);
-      socket.emit("error", "Failed to join room");
     }
+    
+    // Join the new room
+    socket.join(roomId);
+    
+    // Initialize room if it doesn't exist
+    if (!rooms.has(roomId)) {
+      rooms.set(roomId, new Set());
+    }
+    
+    const room = rooms.get(roomId)!;
+    
+    // Get current users in the room
+    const currentUsers = Array.from(room).map(socketId => {
+      const userData = socketUsers.get(socketId);
+      return userData ? { id: userData.id, name: userData.name } : null;
+    }).filter(Boolean);
+    
+    // Add user to room and update mappings
+    room.add(socket.id);
+    userSockets.set(user.id, socket.id);
+    socketUsers.set(socket.id, { ...user, roomId });
+    
+    // Send current users to the new user
+    socket.emit('room-users', currentUsers);
+    
+    // Notify others about the new user
+    socket.to(roomId).emit('user-joined', user);
+    
+    console.log(`Room ${roomId} now has ${room.size} users`);
   });
 
-  // Leave a room
-  socket.on("leave-room", async (data: { roomId: string; userId: string }) => {
-    try {
-      const { roomId, userId } = data;
+  // Handle leaving a room
+  socket.on('leave-room', () => {
+    const user = socketUsers.get(socket.id);
+    if (user && user.roomId) {
+      console.log(`User ${user.name} leaving room ${user.roomId}`);
       
-      socket.leave(roomId);
-      
-      // Remove user from room map
-      if (roomUsers.has(roomId)) {
-        roomUsers.get(roomId)!.delete(socket.id);
-        if (roomUsers.get(roomId)!.size === 0) {
-          roomUsers.delete(roomId);
+      socket.leave(user.roomId);
+      const room = rooms.get(user.roomId);
+      if (room) {
+        room.delete(socket.id);
+        if (room.size === 0) {
+          rooms.delete(user.roomId);
+        } else {
+          // Notify others in the room
+          socket.to(user.roomId).emit('user-left', user.id);
         }
       }
       
-      socket.to(roomId).emit("user-left", { socketId: socket.id, userId, roomId });
-      
-      logger.info(`👋 User ${socket.id} left room ${roomId}`);
-    } catch (error) {
-      logger.error("❌ Error leaving room:", error);
+      // Clean up mappings
+      userSockets.delete(user.id);
+      socketUsers.delete(socket.id);
     }
   });
 
-  // WebRTC Signaling Events
-  socket.on("offer", ({ to, from, offer }) => {
-    logger.info(`📤 Offer from ${from} to ${to}`);
-    socket.to(to).emit("offer", { from, offer });
-  });
-
-  socket.on("answer", ({ to, from, answer }) => {
-    logger.info(`📤 Answer from ${from} to ${to}`);
-    socket.to(to).emit("answer", { from, answer });
-  });
-
-  socket.on("ice-candidate", ({ to, from, candidate }) => {
-    logger.info(`📤 ICE candidate from ${from} to ${to}`);
-    socket.to(to).emit("ice-candidate", { from, candidate });
-  });
-
-  // Handle audio chunks
-  socket.on("audio-chunk", async (data: AudioChunk) => {
-    try {
-      const { userId, roomId, audioData, timestamp } = data;
-      
-      // Transcribe the audio
-      const transcription = await transcriptionService.transcribe(audioData);
-      
-      if (transcription.text.trim()) {
-        // Send transcription back to sender
-        socket.emit("transcription", {
-          text: transcription.text,
-          language: transcription.language,
-          confidence: transcription.confidence,
-          provider: transcription.provider
+  // WebRTC signaling - offer
+  socket.on('offer', (data: { offer: RTCSessionDescriptionInit; to: string }) => {
+    const user = socketUsers.get(socket.id);
+    if (user) {
+      const targetSocketId = userSockets.get(data.to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('offer', {
+          offer: data.offer,
+          from: user.id
         });
-        
-        // For demo purposes, translate to Portuguese
-        const translation = await translationService.translate(
-          transcription.text,
-          "en",
-          "pt"
-        );
-        
-        // Send translated text to others
-        socket.to(roomId).emit("translated-text", {
-          originalText: transcription.text,
-          translatedText: translation.translatedText,
-          sourceLanguage: "en",
-          targetLanguage: "pt",
-          provider: translation.provider
-        });
+        console.log(`Offer sent from ${user.id} to ${data.to}`);
       }
-    } catch (error) {
-      logger.error("Error processing audio chunk:", error);
-      socket.emit("error", "Failed to process audio");
+    }
+  });
+
+  // WebRTC signaling - answer
+  socket.on('answer', (data: { answer: RTCSessionDescriptionInit; to: string }) => {
+    const user = socketUsers.get(socket.id);
+    if (user) {
+      const targetSocketId = userSockets.get(data.to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('answer', {
+          answer: data.answer,
+          from: user.id
+        });
+        console.log(`Answer sent from ${user.id} to ${data.to}`);
+      }
+    }
+  });
+
+  // WebRTC signaling - ICE candidate
+  socket.on('ice-candidate', (data: { candidate: RTCIceCandidateInit; to: string }) => {
+    const user = socketUsers.get(socket.id);
+    if (user) {
+      const targetSocketId = userSockets.get(data.to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('ice-candidate', {
+          candidate: data.candidate,
+          from: user.id
+        });
+        console.log(`ICE candidate sent from ${user.id} to ${data.to}`);
+      }
     }
   });
 
   // Handle disconnection
-  socket.on("disconnect", () => {
-    logger.info(`🔌 User disconnected: ${socket.id}`);
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
     
-    // Remove user from all rooms
-    for (const [roomId, users] of roomUsers.entries()) {
-      if (users.has(socket.id)) {
-        users.delete(socket.id);
-        socket.to(roomId).emit("user-left", { socketId: socket.id, roomId });
-        logger.info(`👋 User ${socket.id} removed from room ${roomId} on disconnect`);
-        
-        // Clean up empty rooms
-        if (users.size === 0) {
-          roomUsers.delete(roomId);
-          logger.info(`🗑️ Room ${roomId} deleted (empty)`);
+    const user = socketUsers.get(socket.id);
+    if (user) {
+      // Remove from room
+      if (user.roomId) {
+        const room = rooms.get(user.roomId);
+        if (room) {
+          room.delete(socket.id);
+          if (room.size === 0) {
+            rooms.delete(user.roomId);
+          } else {
+            // Notify others in the room
+            socket.to(user.roomId).emit('user-left', user.id);
+          }
         }
       }
+      
+      // Clean up mappings
+      userSockets.delete(user.id);
+      socketUsers.delete(socket.id);
     }
   });
 });
 
-const port = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3001;
 
-server.listen(port, () => {
-  logger.info(`🚀 Server listening on port ${port}`);
-  logger.info(`Health check: http://localhost:${port}/health`);
-  logger.info(`Frontend should be running on: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
-  logger.info(`PeerJS server running on port 9000`);
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
