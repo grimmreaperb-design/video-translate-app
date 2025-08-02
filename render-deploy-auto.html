@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deploy Automático - Render</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .step {
+            background: #e8f4fd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007acc;
+        }
+        .config {
+            background: #f0f8f0;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+            font-family: monospace;
+        }
+        .button {
+            display: inline-block;
+            background: #007acc;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 5px;
+            font-weight: bold;
+        }
+        .button:hover {
+            background: #005a9e;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Deploy Automático do Backend no Render</h1>
+        
+        <div class="success">
+            ✅ <strong>Repositório GitHub atualizado!</strong><br>
+            📁 Repositório: https://github.com/grimmreaperb-design/video-translate-app.git
+        </div>
+
+        <h2>📋 Configurações Automáticas</h2>
+        
+        <div class="step">
+            <h3>1. Clique no botão abaixo para abrir o Render:</h3>
+            <a href="https://dashboard.render.com/create?type=web&repo=https://github.com/grimmreaperb-design/video-translate-app.git" 
+               class="button" target="_blank">🔗 Abrir Render Dashboard</a>
+        </div>
+
+        <div class="step">
+            <h3>2. Configure o serviço com estas informações:</h3>
+            <div class="config">
+                <strong>Name:</strong> video-translate-backend<br>
+                <strong>Root Directory:</strong> backend<br>
+                <strong>Environment:</strong> Node<br>
+                <strong>Build Command:</strong> npm install && npm run build<br>
+                <strong>Start Command:</strong> npm start
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>3. Adicione estas variáveis de ambiente:</h3>
+            <div class="config">
+                <strong>PORT:</strong> 10000<br>
+                <strong>NODE_ENV:</strong> production<br>
+                <strong>FRONTEND_URL:</strong> https://video-translate-au6wkha5z-bruno-magalhaes-projects-1d7d6251.vercel.app
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>4. Clique em "Create Web Service"</h3>
+            <p>O deploy será iniciado automaticamente e levará cerca de 3-5 minutos.</p>
+        </div>
+
+        <div class="step">
+            <h3>5. Após o deploy, você receberá uma URL como:</h3>
+            <div class="config">
+                https://video-translate-backend.onrender.com
+            </div>
+            <p><strong>⚠️ IMPORTANTE:</strong> Copie essa URL e me envie para que eu possa atualizar a configuração do frontend!</p>
+        </div>
+
+        <h2>🔄 Links Úteis</h2>
+        <a href="https://render.com" class="button" target="_blank">🌐 Render.com</a>
+        <a href="https://dashboard.render.com" class="button" target="_blank">📊 Dashboard</a>
+        <a href="https://github.com/grimmreaperb-design/video-translate-app" class="button" target="_blank">📁 GitHub Repo</a>
+        
+        <div class="success" style="margin-top: 30px;">
+            <h3>✅ Status Atual:</h3>
+            <p><strong>Frontend:</strong> ✅ Deployado no Vercel</p>
+            <p><strong>Backend:</strong> 🔄 Aguardando deploy no Render</p>
+            <p><strong>Repositório:</strong> ✅ Atualizado no GitHub</p>
+        </div>
+    </div>
+
+    <script>
+        // Auto-abrir o Render após 3 segundos
+        setTimeout(function() {
+            if (confirm('Deseja abrir o Render Dashboard automaticamente?')) {
+                window.open('https://dashboard.render.com/create?type=web&repo=https://github.com/grimmreaperb-design/video-translate-app.git', '_blank');
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

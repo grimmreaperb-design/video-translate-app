@@ -15,17 +15,27 @@ dotenv.config();
 
 const app = express();
 const server = createServer(app);
+const allowedOrigins = [
+  "https://video-translate-app.vercel.app",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL
+].filter((origin): origin is string => Boolean(origin));
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -382,9 +392,11 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-  logger.info(`Health check: http://localhost:${PORT}/health`);
+const port = process.env.PORT || 3001;
+
+server.listen(port, () => {
+  logger.info(`🚀 Server listening on port ${port}`);
+  logger.info(`Health check: http://localhost:${port}/health`);
   logger.info(`Frontend should be running on: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
   logger.info(`PeerJS server running on port 9000`);
 });

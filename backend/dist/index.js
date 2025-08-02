@@ -16,15 +16,24 @@ const logger_1 = require("./utils/logger");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const server = (0, http_1.createServer)(app);
+const allowedOrigins = [
+    "https://video-translate-app.vercel.app",
+    "http://localhost:3000",
+    process.env.FRONTEND_URL
+].filter((origin) => Boolean(origin));
 const io = new socket_io_1.Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:3000",
+        origin: allowedOrigins,
         methods: ["GET", "POST"],
+        credentials: true,
     },
 });
 const PORT = process.env.PORT || 3001;
 // Middleware
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)({
+    origin: allowedOrigins,
+    credentials: true
+}));
 app.use(express_1.default.json({ limit: "50mb" }));
 app.use(express_1.default.urlencoded({ extended: true, limit: "50mb" }));
 // Services
@@ -355,9 +364,10 @@ io.on("connection", (socket) => {
         }
     });
 });
-server.listen(PORT, () => {
-    logger_1.logger.info(`Server running on port ${PORT}`);
-    logger_1.logger.info(`Health check: http://localhost:${PORT}/health`);
+const port = process.env.PORT || 3001;
+server.listen(port, () => {
+    logger_1.logger.info(`🚀 Server listening on port ${port}`);
+    logger_1.logger.info(`Health check: http://localhost:${port}/health`);
     logger_1.logger.info(`Frontend should be running on: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
     logger_1.logger.info(`PeerJS server running on port 9000`);
 });
