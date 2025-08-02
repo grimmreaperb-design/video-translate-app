@@ -191,46 +191,7 @@ app.post("/api/rooms/:id/leave", async (req, res) => {
   }
 });
 
-// Onboarding routes
-app.get("/api/onboarding/languages", (req, res) => {
-  const languages = [
-    { code: "en", name: "English" },
-    { code: "es", name: "Spanish" },
-    { code: "pt", name: "Portuguese" },
-    { code: "fr", name: "French" },
-    { code: "de", name: "German" },
-    { code: "it", name: "Italian" },
-    { code: "ja", name: "Japanese" },
-    { code: "ko", name: "Korean" },
-    { code: "zh", name: "Chinese" },
-    { code: "ru", name: "Russian" },
-    { code: "ar", name: "Arabic" },
-    { code: "hi", name: "Hindi" },
-  ];
-  res.json({ languages });
-});
-
-app.post("/api/onboarding/users", async (req, res) => {
-  try {
-    const { name, language } = req.body;
-    if (supabaseService) {
-      const user = await supabaseService.createUser({ 
-        email: `${name.toLowerCase()}@demo.com`, 
-        name, 
-        language 
-      });
-      res.json({ user });
-    } else {
-      // Fallback: create user in memory
-      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const user = { id: userId, name, language, email: `${name.toLowerCase()}@demo.com`, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-      res.json({ user });
-    }
-  } catch (error) {
-    console.error("Create user error:", error);
-    res.status(500).json({ error: "Failed to create user" });
-  }
-});
+// Onboarding routes removed - no longer needed
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
