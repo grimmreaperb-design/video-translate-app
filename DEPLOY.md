@@ -130,7 +130,7 @@ curl https://video-translate-app.vercel.app/api/health
 - **Google Cloud** (alternativa): $5-30/mês
 
 ### Hosting
-- **Railway**: $5-20/mês (dependendo do uso)
+- **Render**: $7/mês (Web Service)
 - **Vercel**: Gratuito (até 100GB/mês)
 - **MongoDB Atlas**: Gratuito (até 512MB)
 
@@ -149,16 +149,16 @@ MONGODB_URI=mongodb+srv://...
 
 ### Frontend (.env)
 ```bash
-REACT_APP_API_URL=https://your-backend.railway.app
-REACT_APP_SOCKET_URL=https://your-backend.railway.app
+REACT_APP_API_URL=https://video-translate-app.onrender.com/api
+REACT_APP_SOCKET_URL=https://video-translate-app.onrender.com
 ```
 
 ## 🧪 Testes Pós-Deploy
 
 ### 1. Testar Backend
 ```bash
-curl https://your-backend.railway.app/health
-curl https://your-backend.railway.app/api/onboarding/languages
+curl https://video-translate-app.onrender.com/health
+curl https://video-translate-app.onrender.com/api/onboarding/languages
 ```
 
 ### 2. Testar Frontend
@@ -176,11 +176,10 @@ curl https://your-backend.railway.app/api/onboarding/languages
 
 ### Backend não responde
 ```bash
-# Verificar logs no Railway
-railway logs
+# Verificar logs no Render
+# Acesse o dashboard do Render para ver os logs
 
-# Verificar variáveis de ambiente
-railway variables
+# Verificar variáveis de ambiente no Render dashboard
 ```
 
 ### Frontend não conecta
@@ -199,7 +198,7 @@ railway variables
 
 ## 📊 Monitoramento
 
-### Railway Dashboard
+### Render Dashboard
 - Logs em tempo real
 - Métricas de uso
 - Status do serviço
@@ -218,7 +217,7 @@ railway variables
 
 ### Variáveis de Ambiente
 - Nunca commite API keys
-- Use variáveis de ambiente do Railway/Vercel
+- Use variáveis de ambiente do Render/Vercel
 - Rotacione keys regularmente
 
 ### CORS

@@ -38,7 +38,7 @@ MVP totalmente funcional e gratuito para validar tradução em tempo real.
 
 ### 🖥️ **Hosting**
 - **Vercel** (Frontend) - Gratuito
-- **Railway** (Backend) - $5/mês (ou Vercel Functions)
+- **Render** (Backend) - $7/mês
 
 ## 🚀 Setup Step-by-Step
 
@@ -63,12 +63,12 @@ MVP totalmente funcional e gratuito para validar tradução em tempo real.
 2. Configure Site URL: `http://localhost:3000`
 3. Adicione redirect URL: `http://localhost:3000/auth/callback`
 
-### Passo 2: Railway (Backend)
+### Passo 2: Render (Backend)
 
 #### 2.1 Criar Conta
-1. Acesse: https://railway.app/
+1. Acesse: https://render.com/
 2. Conecte GitHub
-3. Crie novo projeto
+3. Crie novo Web Service
 
 #### 2.2 Deploy Backend
 1. Selecione o repositório
@@ -92,8 +92,8 @@ FRONTEND_URL=https://seu-frontend.vercel.app
 ```bash
 REACT_APP_SUPABASE_URL=sua_url_supabase
 REACT_APP_SUPABASE_ANON_KEY=sua_chave_supabase
-REACT_APP_API_URL=https://seu-backend.railway.app
-REACT_APP_SOCKET_URL=https://seu-backend.railway.app
+REACT_APP_API_URL=https://video-translate-app.onrender.com/api
+REACT_APP_SOCKET_URL=https://video-translate-app.onrender.com
 ```
 
 ## 💰 Custos Totais
@@ -101,11 +101,11 @@ REACT_APP_SOCKET_URL=https://seu-backend.railway.app
 | Serviço | Custo | Limite |
 |---------|-------|--------|
 | Supabase | $0 | 500MB DB, 50K users |
-| Railway | $5/mês | 500 horas |
+| Render | $7/mês | Web Service |
 | Vercel | $0 | 100GB/mês |
 | LibreTranslate | $0 | Ilimitado |
 | Web Speech API | $0 | Ilimitado |
-| **Total** | **$5/mês** | MVP funcional |
+| **Total** | **$7/mês** | MVP funcional |
 
 ## 🔧 Configuração Local
 
@@ -171,7 +171,7 @@ npm run dev
 - Uso do banco
 - Logs de auth
 
-### Railway Dashboard
+### Render Dashboard
 - Logs do backend
 - Uso de recursos
 - Status do deploy
@@ -186,7 +186,7 @@ npm run dev
 ### Erro de CORS
 ```bash
 # Verificar FRONTEND_URL no backend
-# Verificar CORS_ORIGIN no Railway
+# Verificar CORS_ORIGIN no Render
 ```
 
 ### Erro de Supabase
@@ -213,4 +213,4 @@ npm run dev
 
 ---
 
-**🎉 MVP gratuito e funcional!** 
+**🎉 MVP gratuito e funcional!**

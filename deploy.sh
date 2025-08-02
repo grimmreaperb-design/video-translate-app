@@ -79,8 +79,8 @@ cd ..
 echo ""
 echo "🚀 Opções de Deploy:"
 echo "===================="
-echo "1. Deploy Manual (Railway + Vercel)"
-echo "2. Deploy com Railway CLI"
+echo "1. Deploy Manual (Render + Vercel)"
+echo "2. Deploy com Render"
 echo "3. Deploy com Vercel CLI"
 echo "4. Apenas verificar configurações"
 echo ""
@@ -93,8 +93,8 @@ case $choice in
         echo "📋 Deploy Manual - Instruções:"
         echo "=============================="
         echo ""
-        echo "1. Backend (Railway):"
-        echo "   - Acesse: https://railway.app/"
+        echo "1. Backend (Render):"
+        echo "   - Acesse: https://render.com/"
         echo "   - Conecte seu GitHub"
         echo "   - Deploy do repositório"
         echo "   - Configure variáveis de ambiente:"
@@ -120,22 +120,9 @@ case $choice in
         ;;
     2)
         echo ""
-        echo "🚀 Deploy com Railway CLI..."
-        if command_exists railway; then
-            print_status "Railway CLI encontrado"
-            cd backend
-            railway login
-            railway up
-            cd ..
-        else
-            print_warning "Railway CLI não encontrado"
-            echo "Instalando Railway CLI..."
-            npm install -g @railway/cli
-            cd backend
-            railway login
-            railway up
-            cd ..
-        fi
+        echo "🚀 Deploy com Render..."
+        echo "Acesse https://render.com/ e faça o deploy manual"
+        echo "Configure as variáveis de ambiente conforme documentação"
         ;;
     3)
         echo ""
@@ -181,7 +168,7 @@ case $choice in
         echo ""
         echo "📋 Próximos passos:"
         echo "1. Configure sua OpenAI API Key"
-        echo "2. Deploy no Railway (backend)"
+        echo "2. Deploy no Render (backend)"
         echo "3. Deploy no Vercel (frontend)"
         echo "4. Configure variáveis de ambiente"
         echo "5. Teste a aplicação"
