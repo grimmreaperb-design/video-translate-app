@@ -1,9 +1,7 @@
-const express = require("express");
-const cors = require("cors");
-const { createServer } = require("http");
-const { Server } = require("socket.io");
-const { PeerServer } = require("peer");
-require("dotenv").config();
+import express from "express";
+import cors from "cors";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 const app = express();
 
@@ -156,21 +154,7 @@ const io = new Server(server, {
   path: "/socket.io/",
 });
 
-// PeerJS Server setup
-const peerServer = PeerServer({
-  port: 9000,
-  path: '/peerjs',
-  proxied: true,
-  allow_discovery: true
-});
-
-peerServer.on('connection', (client) => {
-  console.log(`PeerJS client connected: ${client.getId()}`);
-});
-
-peerServer.on('disconnect', (client) => {
-  console.log(`PeerJS client disconnected: ${client.getId()}`);
-});
+// PeerJS will be handled client-side for Vercel deployment
 
 // In-memory storage for rooms and users (Socket.IO)
 const roomUsers = new Map();
@@ -319,12 +303,5 @@ io.on("connection", (socket) => {
   });
 });
 
-// Start server
-const PORT = process.env.PORT || 3002;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📹 Video conferencing MVP ready!`);
-});
-
 // Export for Vercel
-module.exports = app;
+export default app;

@@ -11,5 +11,5 @@ services:
       - key: PORT
         generateValue: true
       - key: FRONTEND_URL
-        value: https://video-translate-app.vercel.app
+        value: https://video-translate-au6wkha5z-bruno-magalhaes-projects-1d7d6251.vercel.app
     healthCheckPath: /health
