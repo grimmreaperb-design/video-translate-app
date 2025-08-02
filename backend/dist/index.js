@@ -41,30 +41,37 @@ io.on('connection', (socket) => {
     // Handle joining a room
     socket.on('join-room', (data) => {
         const { roomId, user } = data;
-        console.log(`User ${user.name} (${user.id}) joining room ${roomId}`);
+        console.log(`🔵 User ${user.name} (${user.id}) joining room ${roomId} with socket ${socket.id}`);
+        console.log(`🔍 Current rooms:`, Array.from(rooms.keys()));
+        console.log(`🔍 Current users in target room:`, rooms.has(roomId) ? Array.from(rooms.get(roomId)) : 'Room does not exist yet');
         // Leave any previous room
         if (socketUsers.has(socket.id)) {
             const currentUser = socketUsers.get(socket.id);
             if (currentUser.roomId) {
+                console.log(`🔄 User was in room ${currentUser.roomId}, leaving it first`);
                 socket.leave(currentUser.roomId);
                 const currentRoom = rooms.get(currentUser.roomId);
                 if (currentRoom) {
                     currentRoom.delete(socket.id);
                     if (currentRoom.size === 0) {
                         rooms.delete(currentUser.roomId);
+                        console.log(`🗑️ Room ${currentUser.roomId} deleted (empty)`);
                     }
                     else {
                         // Notify others in the previous room
                         socket.to(currentUser.roomId).emit('user-left', currentUser.id);
+                        console.log(`📢 Notified users in ${currentUser.roomId} that ${currentUser.id} left`);
                     }
                 }
             }
         }
         // Join the new room
         socket.join(roomId);
+        console.log(`✅ Socket ${socket.id} joined room ${roomId}`);
         // Initialize room if it doesn't exist
         if (!rooms.has(roomId)) {
             rooms.set(roomId, new Set());
+            console.log(`🆕 Created new room ${roomId}`);
         }
         const room = rooms.get(roomId);
         // Get current users in the room
@@ -72,15 +79,21 @@ io.on('connection', (socket) => {
             const userData = socketUsers.get(socketId);
             return userData ? { id: userData.id, name: userData.name } : null;
         }).filter(Boolean);
+        console.log(`👥 Current users in room before adding new user:`, currentUsers);
         // Add user to room and update mappings
         room.add(socket.id);
         userSockets.set(user.id, socket.id);
         socketUsers.set(socket.id, { ...user, roomId });
+        console.log(`📝 Updated mappings - userSockets:`, Object.fromEntries(userSockets));
+        console.log(`📝 Updated mappings - socketUsers:`, Object.fromEntries(socketUsers));
         // Send current users to the new user
         socket.emit('room-users', currentUsers);
+        console.log(`📤 Sent current users to new user:`, currentUsers);
         // Notify others about the new user
         socket.to(roomId).emit('user-joined', user);
-        console.log(`Room ${roomId} now has ${room.size} users`);
+        console.log(`📢 Notified other users in room ${roomId} about new user ${user.name}`);
+        console.log(`🎯 Room ${roomId} now has ${room.size} users: ${Array.from(room)}`);
+        console.log(`📊 Total rooms: ${rooms.size}, Total users: ${socketUsers.size}`);
     });
     // Handle leaving a room
     socket.on('leave-room', () => {

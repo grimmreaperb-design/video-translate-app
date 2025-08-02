@@ -195,13 +195,9 @@ io.on("connection", (socket) => {
       
       console.log(`👥 Final users in room:`, currentUsers);
       
-      // Send room state to the joining user (matching frontend expectation)
-      const roomState = { 
-        room: { id: roomId, name: `Room ${roomId}` }, 
-        users: currentUsers 
-      };
-      console.log(`📤 Sending room-state to joining user:`, roomState);
-      socket.emit("room-state", roomState);
+      // Send room users to the joining user (matching frontend expectation)
+      console.log(`📤 Sending room-users to joining user:`, currentUsers);
+      socket.emit("room-users", currentUsers);
       
       // Notify others in the room about new user
       console.log(`📢 Notifying others in room about new user:`, user);
