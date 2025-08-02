@@ -16,14 +16,9 @@ const logger_1 = require("./utils/logger");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const server = (0, http_1.createServer)(app);
-const allowedOrigins = [
-    "https://video-translate-app.vercel.app",
-    "http://localhost:3000",
-    process.env.FRONTEND_URL
-].filter((origin) => Boolean(origin));
 const io = new socket_io_1.Server(server, {
     cors: {
-        origin: allowedOrigins,
+        origin: "https://video-translate-app.vercel.app",
         methods: ["GET", "POST"],
         credentials: true,
     },
@@ -31,7 +26,7 @@ const io = new socket_io_1.Server(server, {
 const PORT = process.env.PORT || 3001;
 // Middleware
 app.use((0, cors_1.default)({
-    origin: allowedOrigins,
+    origin: "https://video-translate-app.vercel.app",
     credentials: true
 }));
 app.use(express_1.default.json({ limit: "50mb" }));

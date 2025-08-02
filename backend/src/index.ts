@@ -15,15 +15,9 @@ dotenv.config();
 
 const app = express();
 const server = createServer(app);
-const allowedOrigins = [
-  "https://video-translate-app.vercel.app",
-  "http://localhost:3000",
-  process.env.FRONTEND_URL
-].filter((origin): origin is string => Boolean(origin));
-
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: "https://video-translate-app.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -33,7 +27,7 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
-  origin: allowedOrigins,
+  origin: "https://video-translate-app.vercel.app",
   credentials: true
 }));
 app.use(express.json({ limit: "50mb" }));
