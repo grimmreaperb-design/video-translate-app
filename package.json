@@ -1,0 +1,26 @@
+{
+  "name": "video-translate-app",
+  "version": "1.0.0",
+  "description": "Real-time video translation app",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "test": "cd frontend && npm test -- --watchAll=false",
+    "install:all": "npm install && cd api && npm install && cd ../frontend && npm install",
+    "vercel-build": "cd frontend && npm run build",
+    "deploy": "vercel --prod",
+    "deploy:dev": "vercel"
+  },
+  "dependencies": {
+    "concurrently": "^9.2.0",
+    "express": "^5.1.0",
+    "@vercel/node": "^3.0.0",
+    "peer": "^1.0.2",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}

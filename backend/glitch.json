@@ -1,0 +1,28 @@
+{
+  "install": "npm install",
+  "start": "npm start",
+  "watch": {
+    "ignore": [
+      "\\.git",
+      "node_modules",
+      "dist"
+    ],
+    "install": {
+      "include": [
+        "^package\\.json$",
+        "^package-lock\\.json$"
+      ]
+    },
+    "restart": {
+      "exclude": [
+        "^public/",
+        "^dist/"
+      ],
+      "include": [
+        "\\.js$",
+        "\\.ts$",
+        "\\.json$"
+      ]
+    }
+  }
+}
