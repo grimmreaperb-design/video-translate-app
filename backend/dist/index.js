@@ -200,7 +200,68 @@ app.post("/api/rooms/:id/leave", async (req, res) => {
         res.status(500).json({ error: "Failed to leave room" });
     }
 });
-// Onboarding routes removed - no longer needed
+// Onboarding routes
+app.get("/api/onboarding/languages", (req, res) => {
+    const languages = [
+        { code: "pt-BR", name: "Português (Brasil)" },
+        { code: "en-US", name: "English (United States)" },
+        { code: "es-ES", name: "Español (España)" },
+        { code: "fr-FR", name: "Français (France)" },
+        { code: "de-DE", name: "Deutsch (Deutschland)" },
+        { code: "it-IT", name: "Italiano (Italia)" },
+        { code: "ja-JP", name: "日本語 (日本)" },
+        { code: "ko-KR", name: "한국어 (대한민국)" },
+        { code: "zh-CN", name: "中文 (中国)" },
+        { code: "ru-RU", name: "Русский (Россия)" },
+        { code: "ar-SA", name: "العربية (السعودية)" },
+        { code: "hi-IN", name: "हिन्दी (भारत)" },
+    ];
+    logger_1.logger.info(`📋 Languages requested, returning ${languages.length} languages`);
+    res.json({ languages });
+});
+app.post("/api/onboarding/users", async (req, res) => {
+    try {
+        const { name, language, email } = req.body;
+        // Validação básica
+        if (!name || !language) {
+            return res.status(400).json({
+                error: "Nome e idioma são obrigatórios",
+                details: { name: !!name, language: !!language }
+            });
+        }
+        logger_1.logger.info(`👤 Creating user: ${name} with language: ${language}`);
+        if (supabaseService) {
+            const user = await supabaseService.createUser({
+                email: email || `${name.toLowerCase().replace(/\s+/g, '')}@demo.com`,
+                name,
+                language
+            });
+            logger_1.logger.info(`✅ User created in Supabase: ${user.id}`);
+            res.json({ user, success: true });
+        }
+        else {
+            // Fallback: create user in memory
+            const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const user = {
+                id: userId,
+                name,
+                language,
+                email: email || `${name.toLowerCase().replace(/\s+/g, '')}@demo.com`,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+            logger_1.logger.info(`✅ User created in memory: ${userId}`);
+            res.json({ user, success: true });
+        }
+    }
+    catch (error) {
+        logger_1.logger.error("❌ Create user error:", error);
+        res.status(500).json({
+            error: "Falha ao criar usuário",
+            details: error instanceof Error ? error.message : "Erro desconhecido"
+        });
+    }
+});
 // Map to store room users: roomId -> Set of socketIds
 const roomUsers = new Map();
 // Socket.IO connection handling
