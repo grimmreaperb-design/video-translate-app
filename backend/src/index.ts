@@ -53,7 +53,7 @@ const ttsService = new TTSService();
 app.get("/health", (req, res) => {
   res.json({ 
     status: "OK", 
-    message: "Backend is running!",
+    message: "Backend is running with onboarding routes!",
     supabase: supabaseService ? "connected" : "fallback mode",
     services: {
       translation: translationService.getAvailableProviders(),
