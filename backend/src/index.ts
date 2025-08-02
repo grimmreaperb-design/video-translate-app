@@ -17,7 +17,7 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "https://video-translate-app.vercel.app",
+    origin: ["https://video-translate-app.vercel.app", "http://localhost:3000"],
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -27,8 +27,10 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
-  origin: "https://video-translate-app.vercel.app",
-  credentials: true
+  origin: ["https://video-translate-app.vercel.app", "http://localhost:3000"],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
