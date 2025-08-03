@@ -18,15 +18,9 @@ interface RTCIceCandidateInit {
 const app = express();
 const server = createServer(app);
 
-// CORS configuration
+// CORS configuration - liberado para produção
 const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'https://video-translate-app.vercel.app',
-    'https://video-translate-app-git-main-brunomagalhaes-projects.vercel.app',
-    'https://video-translate-app-brunomagalhaes-projects.vercel.app'
-  ],
+  origin: "*", // Permite qualquer origem
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -35,11 +29,16 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Socket.IO configuration
+// Socket.IO configuration - otimizado para produção
 const io = new Server(server, {
-  cors: corsOptions,
+  cors: {
+    origin: "*", // Permite qualquer origem para Socket.IO
+    methods: ["GET", "POST"]
+  },
   allowEIO3: true,
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 // In-memory storage for rooms and users
@@ -47,9 +46,27 @@ const rooms = new Map<string, Set<string>>();
 const userSockets = new Map<string, string>(); // userId -> socketId
 const socketUsers = new Map<string, { id: string; name: string; roomId?: string }>(); // socketId -> user
 
-// Basic health check endpoint
+// Health check endpoint para Render
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.status(200).json({ 
+    status: 'OK',
+    message: 'Video Translate Backend is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    port: process.env.PORT || 3001
+  });
+});
+
+// Endpoint raiz para verificação básica
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'Video Translate Backend API',
+    status: 'OK',
+    endpoints: {
+      health: '/api/health',
+      socket: '/socket.io/'
+    }
+  });
 });
 
 // Socket.IO connection handling
@@ -216,9 +233,28 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
+// Configuração da porta - Render fornece automaticamente
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+// Iniciar servidor
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Video Translate Backend running on 0.0.0.0:${PORT}`);
+  console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`⚡ Socket.IO ready for WebRTC signaling`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+  });
 });
