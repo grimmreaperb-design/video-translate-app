@@ -1,0 +1,50 @@
+name: Keep Render Backend Awake
+
+on:
+  schedule:
+    # Executa a cada 5 minutos
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # Permite execução manual
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Render Backend
+        run: |
+          echo "🏓 Pinging Render backend to keep it awake..."
+          
+          # Ping do endpoint de health check
+          response=$(curl -s -w "%{http_code}" -o /tmp/response.txt https://video-translate-app.onrender.com/api/health)
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Backend is awake and responding!"
+            echo "📊 Response:"
+            cat /tmp/response.txt
+          else
+            echo "⚠️ Backend returned status code: $response"
+            echo "📄 Response body:"
+            cat /tmp/response.txt
+          fi
+          
+          # Ping adicional do endpoint raiz para garantia
+          echo ""
+          echo "🔄 Additional ping to root endpoint..."
+          root_response=$(curl -s -w "%{http_code}" -o /tmp/root_response.txt https://video-translate-app.onrender.com/)
+          
+          if [ "$root_response" = "200" ]; then
+            echo "✅ Root endpoint also responding!"
+          else
+            echo "⚠️ Root endpoint returned status code: $root_response"
+          fi
+          
+          echo "🕐 Ping completed at $(date)"
+
+      - name: Log ping statistics
+        run: |
+          echo "📈 Ping Statistics:"
+          echo "- Health endpoint: https://video-translate-app.onrender.com/api/health"
+          echo "- Root endpoint: https://video-translate-app.onrender.com/"
+          echo "- Frequency: Every 5 minutes"
+          echo "- Purpose: Prevent Render cold starts"
