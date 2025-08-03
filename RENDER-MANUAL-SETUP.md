@@ -1,104 +1,125 @@
-# 🚀 Manual de Configuração do Render
+# 🚀 Configuração Manual do Backend no Render
 
-## Status Atual
-✅ **Frontend**: Funcionando em https://video-translate-app.vercel.app  
-⚠️ **Backend**: Precisa ser configurado manualmente no Render
+## ✅ Código Pronto
+O backend está **100% pronto** para deploy no Render com o arquivo `server.js` otimizado.
 
-## 📋 Passos para Configurar o Backend no Render
+## 📋 Passos para Configurar no Render
 
 ### 1. Acesse o Render Dashboard
-- Vá para: https://dashboard.render.com
-- Faça login com sua conta GitHub
+- Vá para [render.com](https://render.com)
+- Faça login na sua conta
 
-### 2. Crie um Novo Web Service
+### 2. Criar Novo Web Service
 - Clique em **"New +"** → **"Web Service"**
-- Conecte seu repositório: `grimmreaperb-design/video-translate-app`
-- Selecione o repositório quando aparecer na lista
+- Conecte seu repositório GitHub: `grimmreaperb-design/video-translate-app`
 
-### 3. Configure o Serviço
+### 3. Configurações do Serviço
+
+**Configurações Básicas:**
+- **Name:** `video-translate-backend`
+- **Environment:** `Node`
+- **Region:** `Oregon (US West)` ou mais próximo
+- **Branch:** `main`
+- **Root Directory:** `backend`
+
+**Build & Deploy:**
+- **Build Command:** `npm install`
+- **Start Command:** `npm start`
+
+**Configurações Avançadas:**
+- **Auto-Deploy:** `Yes` (para deploy automático)
+- **Plan:** `Free` (para teste)
+
+### 4. Variáveis de Ambiente
+Adicione estas variáveis (se necessário):
+- `NODE_ENV` = `production`
+- `PORT` = (deixe vazio - Render define automaticamente)
+
+### 5. Verificar Deploy
+Após o deploy, teste:
+- **Health Check:** `https://video-translate-backend.onrender.com/api/health`
+- **Deve retornar:** `OK`
+
+## 🔧 Arquivos Importantes
+
+### `backend/server.js` (Pronto)
+```javascript
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
+
+const app = express();
+app.use(cors());
+
+app.get("/api/health", (req, res) => {
+  res.send("OK");
+});
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+  path: "/socket.io",
+});
+
+// WebRTC signaling logic...
+
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+  console.log(`🚀 Server listening on port ${PORT}`);
+});
 ```
-Name: video-translate-backend
-Environment: Node
-Region: Oregon (US West) ou Frankfurt (EU Central)
-Branch: main
-Root Directory: backend
+
+### `backend/package.json` (Atualizado)
+```json
+{
+  "scripts": {
+    "start": "node server.js",
+    "postinstall": "echo 'No build needed for server.js'"
+  }
+}
 ```
 
-### 4. Comandos de Build e Start
+## 🎯 Frontend Configurado
+O frontend já está configurado com:
+- ✅ Path explícito: `path: "/socket.io"`
+- ✅ CORS compatível
+- ✅ URL de produção: `https://video-translate-backend.onrender.com`
+
+## 🚨 Problemas Comuns
+
+### Se o deploy falhar:
+1. Verifique se o diretório `backend` está correto
+2. Confirme que `npm install` funciona
+3. Teste `npm start` localmente
+
+### Se o health check retornar 404:
+1. O serviço não foi criado corretamente
+2. O nome do serviço está diferente
+3. O deploy ainda está em progresso
+
+### Se o WebSocket não conectar:
+1. Verifique se o servidor está rodando
+2. Confirme que o CORS está configurado
+3. Teste com `path: "/socket.io"` no frontend
+
+## ✅ Teste Local
+Para testar localmente:
+```bash
+cd backend
+node server.js
+curl http://localhost:3001/api/health  # Deve retornar "OK"
 ```
-Build Command: npm install && npm run build
-Start Command: npm start
-```
 
-### 5. Configurações Avançadas
-```
-Auto-Deploy: Yes
-Health Check Path: /api/health (opcional)
-```
-
-### 6. Variáveis de Ambiente
-Adicione as seguintes variáveis:
-```
-NODE_ENV=production
-PORT=10000
-FRONTEND_URL=https://video-translate-app.vercel.app
-```
-
-### 7. Configurar GitHub Secrets (Opcional)
-Para automatizar futuros deploys via GitHub Actions:
-
-1. Vá para: https://github.com/grimmreaperb-design/video-translate-app/settings/secrets/actions
-2. Adicione os secrets:
-   - `RENDER_API_KEY`: Sua API key do Render
-   - `RENDER_SERVICE_ID`: ID do serviço criado
-
-## 🧪 Testando o Deploy
-
-### Após a configuração:
-1. Aguarde o primeiro deploy completar (5-10 minutos)
-2. Teste o backend: https://video-translate-backend.onrender.com
-3. Teste a aplicação: https://video-translate-app.vercel.app
-
-### URLs de Teste:
-- **Frontend**: https://video-translate-app.vercel.app
-- **Backend**: https://video-translate-backend.onrender.com
-- **API**: https://video-translate-backend.onrender.com/api
-- **Socket.IO**: https://video-translate-backend.onrender.com/socket.io/
-
-## 🔧 Solução de Problemas
-
-### Se o backend não iniciar:
-1. Verifique os logs no Render Dashboard
-2. Confirme que as variáveis de ambiente estão corretas
-3. Verifique se o `Root Directory` está definido como `backend`
-
-### Se o Socket.IO não conectar:
-1. Verifique se o CORS está configurado corretamente
-2. Confirme que a URL do frontend está nas variáveis de ambiente
-3. Teste a conectividade: `curl https://video-translate-backend.onrender.com/socket.io/`
-
-## 📊 Status dos Componentes
-
-| Componente | Status | URL |
-|------------|--------|-----|
-| Frontend Vercel | ✅ Funcionando | https://video-translate-app.vercel.app |
-| Backend Vercel | ✅ Temporário | https://video-translate-app.vercel.app/api |
-| Backend Render | ⏳ Configuração Manual | https://video-translate-backend.onrender.com |
-
-## 🎯 Próximos Passos
-
-1. **Configure o Render** seguindo os passos acima
-2. **Teste o backend** quando estiver online
-3. **Monitore os logs** para garantir que está funcionando
-4. **Configure auto-deploy** com GitHub Secrets (opcional)
-
-## 📞 Suporte
-
-Se encontrar problemas:
-1. Verifique os logs no Render Dashboard
-2. Teste localmente primeiro: `cd backend && npm run dev`
-3. Compare com a configuração local funcionando
+## 🔗 URLs Finais
+- **Backend:** `https://video-translate-backend.onrender.com`
+- **Frontend:** `https://video-translate-app.vercel.app`
+- **Health Check:** `https://video-translate-backend.onrender.com/api/health`
 
 ---
 
-**Nota**: O frontend já está configurado para usar o backend do Render quando estiver disponível. Enquanto isso, está usando o backend do Vercel como fallback.
+**Status:** ✅ Código pronto | ⏳ Aguardando configuração manual no Render

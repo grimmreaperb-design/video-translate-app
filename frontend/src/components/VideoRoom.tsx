@@ -435,7 +435,8 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         forceNew: true,
         reconnection: false, // We handle reconnection manually
         upgrade: true, // Allow transport upgrades
-        rememberUpgrade: false // Don't remember upgrades between sessions
+        rememberUpgrade: false, // Don't remember upgrades between sessions
+        path: "/socket.io" // obrigatório para evitar erro
       });
       
       socketRef.current = socket;
