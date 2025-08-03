@@ -9,29 +9,33 @@ function App() {
 
   useEffect(() => {
     // Check if there's a roomId parameter in the URL
-    console.log('🔍 [DEBUG] App.tsx useEffect executando...');
-    console.log('🔍 [DEBUG] URL completa:', window.location.href);
+    console.error('🔍 [DEBUG] App.tsx useEffect executando...');
+    console.error('🔍 [DEBUG] URL completa:', window.location.href);
+    alert('DEBUG: App.tsx useEffect executando - URL: ' + window.location.href);
     
     const urlParams = new URLSearchParams(window.location.search);
     const roomFromUrl = urlParams.get('roomId');
     
-    console.log('🔍 [DEBUG] Parâmetros da URL:', urlParams.toString());
-    console.log('🔍 [DEBUG] roomFromUrl extraído:', roomFromUrl);
-    console.log('🔍 [DEBUG] Tipo do roomFromUrl:', typeof roomFromUrl);
+    console.error('🔍 [DEBUG] Parâmetros da URL:', urlParams.toString());
+    console.error('🔍 [DEBUG] roomFromUrl extraído:', roomFromUrl);
+    console.error('🔍 [DEBUG] Tipo do roomFromUrl:', typeof roomFromUrl);
+    alert('DEBUG: roomFromUrl = ' + roomFromUrl);
     
     if (roomFromUrl && roomFromUrl.trim()) {
       const cleanRoomId = roomFromUrl.trim();
-      console.log('✅ [DEBUG] Room ID válido encontrado:', cleanRoomId);
-      console.log('✅ [DEBUG] Definindo currentRoom para:', cleanRoomId);
-      console.log('✅ [DEBUG] Definindo isJoiningFromUrl para: true');
+      console.error('✅ [DEBUG] Room ID válido encontrado:', cleanRoomId);
+      console.error('✅ [DEBUG] Definindo currentRoom para:', cleanRoomId);
+      console.error('✅ [DEBUG] Definindo isJoiningFromUrl para: true');
+      alert('DEBUG: Room ID encontrado: ' + cleanRoomId);
       
       setCurrentRoom(cleanRoomId);
       setIsJoiningFromUrl(true);
       
-      console.log('✅ [DEBUG] Estados definidos - currentRoom:', cleanRoomId, 'isJoiningFromUrl: true');
+      console.error('✅ [DEBUG] Estados definidos - currentRoom:', cleanRoomId, 'isJoiningFromUrl: true');
     } else {
-      console.log('❌ [DEBUG] Nenhum roomId válido encontrado na URL');
-      console.log('❌ [DEBUG] roomFromUrl é:', roomFromUrl);
+      console.error('❌ [DEBUG] Nenhum roomId válido encontrado na URL');
+      console.error('❌ [DEBUG] roomFromUrl é:', roomFromUrl);
+      alert('DEBUG: PROBLEMA - Nenhum roomId encontrado!');
     }
   }, []);
 
@@ -40,27 +44,30 @@ function App() {
   };
 
   const handleStartCall = (name: string) => {
-    console.log('🚀 [DEBUG] handleStartCall executando...');
-    console.log('🚀 [DEBUG] Parâmetros recebidos - name:', name);
-    console.log('🚀 [DEBUG] Estado atual - isJoiningFromUrl:', isJoiningFromUrl);
-    console.log('🚀 [DEBUG] Estado atual - currentRoom:', currentRoom);
+    console.error('🚀 [DEBUG] handleStartCall executando...');
+    console.error('🚀 [DEBUG] Parâmetros recebidos - name:', name);
+    console.error('🚀 [DEBUG] Estado atual - isJoiningFromUrl:', isJoiningFromUrl);
+    console.error('🚀 [DEBUG] Estado atual - currentRoom:', currentRoom);
+    alert('DEBUG handleStartCall: isJoiningFromUrl=' + isJoiningFromUrl + ', currentRoom=' + currentRoom);
     
     if (isJoiningFromUrl && currentRoom) {
       // Joining existing room from URL
-      console.log('✅ [DEBUG] CENÁRIO: Entrando em sala existente da URL');
-      console.log('✅ [DEBUG] Room ID que será usado:', currentRoom);
+      console.error('✅ [DEBUG] CENÁRIO: Entrando em sala existente da URL');
+      console.error('✅ [DEBUG] Room ID que será usado:', currentRoom);
+      alert('DEBUG: SUCESSO - Usando Room ID da URL: ' + currentRoom);
       setUserName(name);
       setIsJoiningFromUrl(false);
-      console.log('✅ [DEBUG] Estados finais - userName:', name, 'currentRoom:', currentRoom);
+      console.error('✅ [DEBUG] Estados finais - userName:', name, 'currentRoom:', currentRoom);
     } else {
       // Creating new room
-      console.log('❌ [DEBUG] CENÁRIO: Criando nova sala (PROBLEMA!)');
-      console.log('❌ [DEBUG] Motivo - isJoiningFromUrl:', isJoiningFromUrl, 'currentRoom:', currentRoom);
+      console.error('❌ [DEBUG] CENÁRIO: Criando nova sala (PROBLEMA!)');
+      console.error('❌ [DEBUG] Motivo - isJoiningFromUrl:', isJoiningFromUrl, 'currentRoom:', currentRoom);
       const roomId = generateRoomId();
-      console.log('❌ [DEBUG] Novo Room ID gerado:', roomId);
+      console.error('❌ [DEBUG] Novo Room ID gerado:', roomId);
+      alert('DEBUG: PROBLEMA - Criando nova sala: ' + roomId + ' (isJoiningFromUrl=' + isJoiningFromUrl + ', currentRoom=' + currentRoom + ')');
       setCurrentRoom(roomId);
       setUserName(name);
-      console.log('❌ [DEBUG] Estados finais - userName:', name, 'currentRoom:', roomId);
+      console.error('❌ [DEBUG] Estados finais - userName:', name, 'currentRoom:', roomId);
     }
   };
 
