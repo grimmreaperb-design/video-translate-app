@@ -64,6 +64,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const isComponentMountedRef = useRef<boolean>(true);
+  const answersReceivedRef = useRef<Set<string>>(new Set()); // 🚨 NOVO: Rastrear answers processadas
   const reconnectionRef = useRef<ReconnectionState>({
     attempts: 0,
     maxAttempts: 8,
@@ -324,30 +325,70 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleOffer = useCallback(async (data: { from: string; offer: RTCSessionDescriptionInit }) => {
     try {
-      console.log(`[TEST-LOG] 🔥 STEP 4: Received offer from ${data.from}`);
-      console.log(`[TEST-LOG] 📝 Offer details:`, data.offer.type, data.offer.sdp?.substring(0, 100) + '...');
+      console.log(`[TEST-LOG] 🔥 STEP 4: Received offer from ${data?.from || 'undefined'}`);
+      console.log(`[TEST-LOG] 📝 Offer details:`, data?.offer?.type, data?.offer?.sdp?.substring(0, 100) + '...');
+      
+      if (!data || !data.offer) {
+        console.error('[TEST-LOG] ❌ Received offer with invalid data:', data);
+        return;
+      }
       
       if (!data.from) {
         console.error('[TEST-LOG] ❌ Received offer with undefined from field');
         return;
       }
+
+      // 🚨 CORREÇÃO: Verificar se já existe uma conexão para evitar duplicatas
+      const existingPc = peerConnectionsRef.current.get(data.from);
+      if (existingPc) {
+        console.log(`[RTC-STATE] Existing connection state: ${existingPc.signalingState}`);
+        
+        // Se já estamos em stable, ignorar nova offer
+        if (existingPc.signalingState === 'stable') {
+          console.warn(`[TEST-LOG] ⚠️ Conexão já estabelecida com ${data.from}, ignorando nova offer`);
+          return;
+        }
+        
+        // Se já estamos processando uma offer, implementar "polite peer" strategy
+        if (existingPc.signalingState === 'have-remote-offer') {
+          console.warn(`[TEST-LOG] ⚠️ Já processando offer de ${data.from}, ignorando duplicata`);
+          return;
+        }
+        
+        // Se temos local offer e recebemos remote offer (glare condition)
+        if (existingPc.signalingState === 'have-local-offer') {
+          // Implementar polite peer: quem tem ID menor "ganha"
+          const isPolite = userId < data.from;
+          if (isPolite) {
+            console.log(`[TEST-LOG] 🤝 Glare detectado, sendo polite peer - rollback local offer`);
+            // Rollback nossa offer e aceitar a deles
+            await existingPc.setLocalDescription({type: 'rollback'});
+          } else {
+            console.log(`[TEST-LOG] 🤝 Glare detectado, sendo impolite peer - ignorando remote offer`);
+            return;
+          }
+        }
+      }
       
-      const pc = createPeerConnection(data.from, ''); // socketId will be resolved by backend
+      const pc = existingPc || createPeerConnection(data.from, ''); // socketId will be resolved by backend
       if (!pc) {
         console.error(`[TEST-LOG] ❌ Failed to create peer connection for ${data.from}`);
         return;
       }
       
-      console.log(`[TEST-LOG] 🔗 Peer connection created for incoming offer from ${data.from}`);
+      console.log(`[TEST-LOG] 🔗 Peer connection ready for incoming offer from ${data.from}`);
+      console.log(`[RTC-STATE] Before setRemoteDescription(offer): ${pc.signalingState}`);
       
       await pc.setRemoteDescription(data.offer);
       console.log(`[TEST-LOG] 📌 Remote description set for ${data.from}`);
+      console.log(`[RTC-STATE] After setRemoteDescription(offer): ${pc.signalingState}`);
       
       const answer = await pc.createAnswer();
       console.log(`[TEST-LOG] 📝 Answer created for ${data.from}:`, answer.type, answer.sdp?.substring(0, 100) + '...');
       
       await pc.setLocalDescription(answer);
       console.log(`[TEST-LOG] 📌 Local description (answer) set for ${data.from}`);
+      console.log(`[RTC-STATE] After setLocalDescription(answer): ${pc.signalingState}`);
       
       if (socketRef.current) {
         socketRef.current.emit('webrtc-answer', {
@@ -358,29 +399,29 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       }
 
       // 🔥 CORREÇÃO CRÍTICA: Adicionar ao peerConnectionsRef para que ICE candidates possam encontrar
-      peerConnectionsRef.current.set(data.from, pc);
-      console.log(`[TEST-LOG] ✅ Peer connection stored in ref for ${data.from}`);
-      // 🔧 2. Confirmar se peerConnectionsRef.current.set() está realmente sendo chamado
-      console.log(`[TEST-LOG] ✅ PeerConnection adicionada ao mapa para ${data.from}`);
-
-      setPeerConnections(prev => {
-        // Safety check to prevent state corruption
-        if (!isComponentMountedRef.current) return prev;
+      if (!existingPc) {
+        peerConnectionsRef.current.set(data.from, pc);
+        console.log(`[TEST-LOG] ✅ Peer connection stored in ref for ${data.from}`);
         
-        // Check for duplicates to prevent multiple entries
-        const exists = prev.some(conn => conn.userId === data.from);
-        if (exists) {
-          logger.log(`[TEST-LOG] ⚠️ Peer connection already exists for ${data.from}, skipping`, 'warn');
-          return prev;
-        }
-        
-        return [...prev, { 
-          userId: data.from, 
-          socketId: '', // Will be updated when we get the socket mapping
-          connection: pc,
-          isConnected: false
-        }];
-      });
+        setPeerConnections(prev => {
+          // Safety check to prevent state corruption
+          if (!isComponentMountedRef.current) return prev;
+          
+          // Check for duplicates to prevent multiple entries
+          const exists = prev.some(conn => conn.userId === data.from);
+          if (exists) {
+            logger.log(`[TEST-LOG] ⚠️ Peer connection already exists for ${data.from}, skipping`, 'warn');
+            return prev;
+          }
+          
+          return [...prev, { 
+            userId: data.from, 
+            socketId: '', // Will be updated when we get the socket mapping
+            connection: pc,
+            isConnected: false
+          }];
+        });
+      }
     } catch (error) {
       console.error(`[TEST-LOG] ❌ Error handling offer from ${data.from}:`, error);
     }
@@ -402,22 +443,58 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         console.error('[TEST-LOG] ❌ Received answer without answer data from', data.from);
         return;
       }
+
+      // 🚨 CORREÇÃO: Verificar se já processamos answer deste peer
+      if (answersReceivedRef.current.has(data.from)) {
+        console.warn(`[TEST-LOG] ⚠️ Answer já processada para ${data.from}, ignorando duplicata`);
+        return;
+      }
       
       const pc = peerConnectionsRef.current.get(data.from);
-      if (pc) {
-        await pc.setRemoteDescription(data.answer);
-        console.log(`[TEST-LOG] ✅ Answer processed and remote description set for ${data.from}`);
-        console.log(`[TEST-LOG] 🔗 Connection state: ${pc.connectionState}, ICE state: ${pc.iceConnectionState}`);
-      } else {
+      if (!pc) {
         console.error(`[TEST-LOG] ❌ CRITICAL: No peer connection found for answer from ${data.from}`);
         console.error(`[TEST-LOG] ❌ This should not happen - peer connection should exist from createOffer or handleOffer`);
         console.error(`[TEST-LOG] ❌ Available connections:`, Array.from(peerConnectionsRef.current.keys()));
         return;
       }
+
+      // 🚨 CORREÇÃO CRÍTICA: Verificar estado antes de setRemoteDescription
+      console.log(`[RTC-STATE] Before setRemoteDescription: ${pc.signalingState}`);
+      
+      // Proteger contra múltiplas chamadas de setRemoteDescription(answer)
+      if (pc.signalingState === 'stable') {
+        console.warn(`[TEST-LOG] ⚠️ Já em estado stable, ignorando nova answer de ${data.from}`);
+        return;
+      }
+      
+      // Verificar se já temos uma remote description
+      if (pc.remoteDescription && pc.remoteDescription.type === 'answer') {
+        console.warn(`[TEST-LOG] ⚠️ Remote answer já definida para ${data.from}, ignorando duplicata`);
+        return;
+      }
+      
+      // Verificar se estamos no estado correto para receber answer
+      if (pc.signalingState !== 'have-local-offer') {
+        console.warn(`[TEST-LOG] ⚠️ Estado incorreto para answer: ${pc.signalingState}, esperado: have-local-offer`);
+        return;
+      }
+
+      // 🚨 MARCAR como processada ANTES de processar para evitar race conditions
+      answersReceivedRef.current.add(data.from);
+
+      await pc.setRemoteDescription(data.answer);
+      console.log(`[TEST-LOG] ✅ Answer processed and remote description set for ${data.from}`);
+      console.log(`[TEST-LOG] 🔗 Connection state: ${pc.connectionState}, ICE state: ${pc.iceConnectionState}`);
+      console.log(`[RTC-STATE] After setRemoteDescription: ${pc.signalingState}`);
+      
     } catch (error) {
       console.error(`[TEST-LOG] ❌ Error handling answer from ${data?.from || 'undefined'}:`, error);
+      // 🚨 REMOVER da lista se houve erro para permitir retry
+      if (data?.from) {
+        answersReceivedRef.current.delete(data.from);
+      }
     }
-  }, [createPeerConnection]);
+  }, []);
 
   // Handle ICE candidate
   const handleIceCandidate = useCallback(async (data: { from: string; candidate: RTCIceCandidateInit }) => {
@@ -840,6 +917,8 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       try {
         setPeerConnections([]);
         setUsersInRoom([]);
+        // 🚨 LIMPEZA: Reset controle de answers processadas
+        answersReceivedRef.current.clear();
       } catch (error) {
         console.warn('Error during state cleanup:', error);
       }
@@ -859,6 +938,9 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     
     peerConnectionsRef.current.forEach(pc => pc.close());
     peerConnectionsRef.current.clear();
+    
+    // 🚨 LIMPEZA: Reset controle de answers processadas
+    answersReceivedRef.current.clear();
     
     onLeaveRoom();
   };
