@@ -214,7 +214,9 @@ io.on("connection", (socket) => {
       }
       
       // Notify others in the room
-      socket.to(roomId).emit("user-joined", { userId, roomId });
+      // Get user data for proper emission
+      let user = { id: userId, name: `User-${userId.slice(0, 6)}` };
+      socket.to(roomId).emit("user-joined", user);
       
       console.log(`User ${userId} joined room ${roomId}`);
     } catch (error) {
