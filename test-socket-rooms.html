@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Socket.IO Rooms</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .user-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 4px solid #007bff;
+        }
+        .logs {
+            font-family: monospace;
+            background: #1e1e1e;
+            color: #ffffff;
+            padding: 15px;
+            border-radius: 5px;
+            height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Teste Socket.IO Rooms - Debug Salas Separadas</h1>
+        
+        <div class="user-section">
+            <h3>⚙️ Configuração</h3>
+            <label>Room ID: <input type="text" id="roomId" value="test-room-123" placeholder="ID da sala"></label>
+            <label>Backend URL: <input type="text" id="backendUrl" value="http://localhost:3001" placeholder="URL do backend"></label>
+            <button onclick="updateConfig()">🔄 Atualizar Configuração</button>
+        </div>
+
+        <div class="grid">
+            <div class="user-section">
+                <h3>👤 Usuário 1 (Alice)</h3>
+                <div id="status1" class="status disconnected">Desconectado</div>
+                <label>Nome: <input type="text" id="name1" value="Alice" placeholder="Nome do usuário"></label>
+                <br>
+                <button id="connect1" onclick="connectUser1()">🔌 Conectar</button>
+                <button id="join1" onclick="joinRoom1()" disabled>🚪 Entrar na Sala</button>
+                <button id="disconnect1" onclick="disconnectUser1()" disabled>❌ Desconectar</button>
+                <div id="logs1" class="logs"></div>
+            </div>
+
+            <div class="user-section">
+                <h3>👤 Usuário 2 (Bob)</h3>
+                <div id="status2" class="status disconnected">Desconectado</div>
+                <label>Nome: <input type="text" id="name2" value="Bob" placeholder="Nome do usuário"></label>
+                <br>
+                <button id="connect2" onclick="connectUser2()">🔌 Conectar</button>
+                <button id="join2" onclick="joinRoom2()" disabled>🚪 Entrar na Sala</button>
+                <button id="disconnect2" onclick="disconnectUser2()" disabled>❌ Desconectar</button>
+                <div id="logs2" class="logs"></div>
+            </div>
+        </div>
+
+        <div class="user-section">
+            <h3>📊 Análise dos Resultados</h3>
+            <div id="analysis">
+                <p>Conecte ambos os usuários e faça-os entrar na mesma sala para ver a análise.</p>
+            </div>
+        </div>
+
+        <div class="user-section">
+            <h3>🎯 O que este teste verifica:</h3>
+            <ul>
+                <li>✅ Conexão Socket.IO com o backend</li>
+                <li>✅ Evento join-room sendo enviado corretamente</li>
+                <li>✅ Evento room-users sendo recebido com lista de usuários</li>
+                <li>✅ Evento user-joined sendo recebido quando outro usuário entra</li>
+                <li>✅ Sincronização de estado entre usuários na mesma sala</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let socket1 = null;
+        let socket2 = null;
+        let user1Id = null;
+        let user2Id = null;
+        let roomId = 'test-room-123';
+        let backendUrl = 'http://localhost:3001';
+
+        function log(userId, message, type = 'info') {
+            const logsElement = document.getElementById(`logs${userId}`);
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ff6b6b' : type === 'warn' ? '#feca57' : type === 'success' ? '#48dbfb' : '#ffffff';
+            logsElement.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logsElement.scrollTop = logsElement.scrollHeight;
+        }
+
+        function updateStatus(userId, status) {
+            const statusElement = document.getElementById(`status${userId}`);
+            statusElement.className = `status ${status}`;
+            statusElement.textContent = status === 'connected' ? 'Conectado' : 
+                                      status === 'connecting' ? 'Conectando...' : 'Desconectado';
+        }
+
+        function updateButtons(userId, connected, inRoom) {
+            document.getElementById(`connect${userId}`).disabled = connected;
+            document.getElementById(`join${userId}`).disabled = !connected || inRoom;
+            document.getElementById(`disconnect${userId}`).disabled = !connected;
+        }
+
+        function updateConfig() {
+            roomId = document.getElementById('roomId').value;
+            backendUrl = document.getElementById('backendUrl').value;
+            log(1, `🔄 Configuração atualizada: Room=${roomId}, Backend=${backendUrl}`, 'info');
+            log(2, `🔄 Configuração atualizada: Room=${roomId}, Backend=${backendUrl}`, 'info');
+        }
+
+        function generateUserId() {
+            return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
+
+        function connectUser1() {
+            if (socket1) return;
+            
+            updateStatus(1, 'connecting');
+            log(1, `🔌 Conectando ao backend: ${backendUrl}`, 'info');
+            
+            user1Id = generateUserId();
+            log(1, `👤 User ID gerado: ${user1Id}`, 'info');
+            
+            socket1 = io(backendUrl, {
+                transports: ['websocket', 'polling']
+            });
+
+            socket1.on('connect', () => {
+                updateStatus(1, 'connected');
+                updateButtons(1, true, false);
+                log(1, `✅ Conectado! Socket ID: ${socket1.id}`, 'success');
+            });
+
+            socket1.on('disconnect', () => {
+                updateStatus(1, 'disconnected');
+                updateButtons(1, false, false);
+                log(1, `❌ Desconectado`, 'error');
+            });
+
+            socket1.on('room-users', (users) => {
+                log(1, `📋 room-users recebido: ${JSON.stringify(users)}`, 'success');
+                log(1, `👥 Total de usuários na sala: ${users.length}`, 'success');
+                updateAnalysis();
+            });
+
+            socket1.on('user-joined', (user) => {
+                log(1, `🎉 user-joined recebido: ${JSON.stringify(user)}`, 'success');
+                updateAnalysis();
+            });
+
+            socket1.on('user-left', (userId) => {
+                log(1, `👋 user-left recebido: ${userId}`, 'warn');
+                updateAnalysis();
+            });
+
+            socket1.on('error', (error) => {
+                log(1, `❌ Erro: ${error}`, 'error');
+            });
+        }
+
+        function connectUser2() {
+            if (socket2) return;
+            
+            updateStatus(2, 'connecting');
+            log(2, `🔌 Conectando ao backend: ${backendUrl}`, 'info');
+            
+            user2Id = generateUserId();
+            log(2, `👤 User ID gerado: ${user2Id}`, 'info');
+            
+            socket2 = io(backendUrl, {
+                transports: ['websocket', 'polling']
+            });
+
+            socket2.on('connect', () => {
+                updateStatus(2, 'connected');
+                updateButtons(2, true, false);
+                log(2, `✅ Conectado! Socket ID: ${socket2.id}`, 'success');
+            });
+
+            socket2.on('disconnect', () => {
+                updateStatus(2, 'disconnected');
+                updateButtons(2, false, false);
+                log(2, `❌ Desconectado`, 'error');
+            });
+
+            socket2.on('room-users', (users) => {
+                log(2, `📋 room-users recebido: ${JSON.stringify(users)}`, 'success');
+                log(2, `👥 Total de usuários na sala: ${users.length}`, 'success');
+                updateAnalysis();
+            });
+
+            socket2.on('user-joined', (user) => {
+                log(2, `🎉 user-joined recebido: ${JSON.stringify(user)}`, 'success');
+                updateAnalysis();
+            });
+
+            socket2.on('user-left', (userId) => {
+                log(2, `👋 user-left recebido: ${userId}`, 'warn');
+                updateAnalysis();
+            });
+
+            socket2.on('error', (error) => {
+                log(2, `❌ Erro: ${error}`, 'error');
+            });
+        }
+
+        function joinRoom1() {
+            if (!socket1 || !socket1.connected) return;
+            
+            const userName = document.getElementById('name1').value;
+            const userData = {
+                roomId: roomId,
+                user: {
+                    id: user1Id,
+                    name: userName
+                }
+            };
+            
+            log(1, `🚪 Enviando join-room: ${JSON.stringify(userData)}`, 'info');
+            socket1.emit('join-room', userData);
+            updateButtons(1, true, true);
+        }
+
+        function joinRoom2() {
+            if (!socket2 || !socket2.connected) return;
+            
+            const userName = document.getElementById('name2').value;
+            const userData = {
+                roomId: roomId,
+                user: {
+                    id: user2Id,
+                    name: userName
+                }
+            };
+            
+            log(2, `🚪 Enviando join-room: ${JSON.stringify(userData)}`, 'info');
+            socket2.emit('join-room', userData);
+            updateButtons(2, true, true);
+        }
+
+        function disconnectUser1() {
+            if (socket1) {
+                socket1.disconnect();
+                socket1 = null;
+                user1Id = null;
+                updateStatus(1, 'disconnected');
+                updateButtons(1, false, false);
+                log(1, `🔌 Desconectado manualmente`, 'warn');
+            }
+        }
+
+        function disconnectUser2() {
+            if (socket2) {
+                socket2.disconnect();
+                socket2 = null;
+                user2Id = null;
+                updateStatus(2, 'disconnected');
+                updateButtons(2, false, false);
+                log(2, `🔌 Desconectado manualmente`, 'warn');
+            }
+        }
+
+        function updateAnalysis() {
+            const analysisElement = document.getElementById('analysis');
+            
+            const user1Connected = socket1 && socket1.connected;
+            const user2Connected = socket2 && socket2.connected;
+            
+            let analysis = '<h4>📊 Status Atual:</h4>';
+            analysis += `<p>👤 Alice (User 1): ${user1Connected ? '✅ Conectado' : '❌ Desconectado'}</p>`;
+            analysis += `<p>👤 Bob (User 2): ${user2Connected ? '✅ Conectado' : '❌ Desconectado'}</p>`;
+            analysis += `<p>🏠 Room ID: ${roomId}</p>`;
+            
+            if (user1Connected && user2Connected) {
+                analysis += '<h4>🔍 Verificações:</h4>';
+                analysis += '<ul>';
+                analysis += '<li>✅ Ambos os usuários estão conectados</li>';
+                analysis += '<li>✅ Ambos devem receber room-users com a lista completa</li>';
+                analysis += '<li>✅ Cada usuário deve receber user-joined quando o outro entra</li>';
+                analysis += '<li>✅ O contador de usuários deve ser igual em ambos os lados</li>';
+                analysis += '</ul>';
+                
+                analysis += '<h4>🎯 Próximos Passos:</h4>';
+                analysis += '<ol>';
+                analysis += '<li>Faça Alice entrar na sala primeiro</li>';
+                analysis += '<li>Observe os logs de Alice para room-users</li>';
+                analysis += '<li>Faça Bob entrar na sala</li>';
+                analysis += '<li>Observe se Alice recebe user-joined para Bob</li>';
+                analysis += '<li>Observe se Bob recebe room-users com Alice na lista</li>';
+                analysis += '</ol>';
+            }
+            
+            analysisElement.innerHTML = analysis;
+        }
+
+        // Inicialização
+        window.onload = function() {
+            updateAnalysis();
+        };
+    </script>
+</body>
+</html>
