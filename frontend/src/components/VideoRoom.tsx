@@ -675,7 +675,14 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         if (!isComponentMountedRef.current) return;
         
         try {
+          // 🧪 Verificação defensiva conforme sugerido
+          if (typeof newUser === "string") {
+            console.warn("❌ user-joined veio como string:", newUser);
+            return;
+          }
+          
           console.log('[USER-JOIN] Novo usuário recebido:', newUser);
+          console.log("✅ Novo usuário:", newUser?.name || 'Nome não disponível');
           
           if (!newUser || !newUser.id || !newUser.name) {
             console.error('[USER-JOIN] ❌ Invalid user data in user-joined event:', JSON.stringify(newUser));

@@ -252,8 +252,14 @@ io.on("connection", (socket) => {
         socket.emit("room-state", { room: null, participants: [] });
       }
       
-      // Notify others in the room
-      socket.to(roomId).emit("user-joined", { userId, roomId });
+      // Notify others in the room with complete user object
+      const userToEmit = {
+        id: userId,
+        name: `User-${userId.slice(-6)}`, // Generate a name based on userId
+        room: roomId,
+        socketId: socket.id
+      };
+      socket.to(roomId).emit("user-joined", userToEmit);
       
       console.log(`User ${userId} joined room ${roomId}`);
     } catch (error) {

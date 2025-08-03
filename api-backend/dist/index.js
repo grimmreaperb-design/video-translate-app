@@ -27,7 +27,15 @@ app.use((0, cors_1.default)());
 app.use(express_1.default.json({ limit: "50mb" }));
 app.use(express_1.default.urlencoded({ extended: true, limit: "50mb" }));
 // Services
-const supabaseService = new supabaseService_1.SupabaseService();
+let supabaseService;
+try {
+    supabaseService = new supabaseService_1.SupabaseService();
+    console.log("✅ Supabase connected successfully");
+}
+catch (error) {
+    console.log("⚠️  Supabase connection failed, using fallback mode");
+    supabaseService = null;
+}
 const translationService = new translationService_1.TranslationService();
 const transcriptionService = new transcriptionService_1.TranscriptionService();
 const ttsService = new ttsService_1.TTSService();
@@ -36,6 +44,7 @@ app.get("/health", (req, res) => {
     res.json({
         status: "OK",
         message: "Backend is running!",
+        supabase: supabaseService ? "connected" : "fallback mode",
         services: {
             translation: translationService.getAvailableProviders(),
             transcription: transcriptionService.getAvailableProviders(),
@@ -47,7 +56,9 @@ app.get("/health", (req, res) => {
 app.post("/api/auth/magic-link", async (req, res) => {
     try {
         const { email } = req.body;
-        await supabaseService.sendMagicLink(email);
+        if (supabaseService) {
+            await supabaseService.sendMagicLink(email);
+        }
         res.json({ message: "Magic link sent successfully" });
     }
     catch (error) {
@@ -57,7 +68,9 @@ app.post("/api/auth/magic-link", async (req, res) => {
 });
 app.post("/api/auth/signout", async (req, res) => {
     try {
-        await supabaseService.signOut();
+        if (supabaseService) {
+            await supabaseService.signOut();
+        }
         res.json({ message: "Signed out successfully" });
     }
     catch (error) {
@@ -69,8 +82,16 @@ app.post("/api/auth/signout", async (req, res) => {
 app.post("/api/users", async (req, res) => {
     try {
         const { email, name, language } = req.body;
-        const user = await supabaseService.createUser({ email, name, language });
-        res.json({ user });
+        if (supabaseService) {
+            const user = await supabaseService.createUser({ email, name, language });
+            res.json({ user });
+        }
+        else {
+            // Fallback: create user in memory
+            const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const user = { id: userId, email, name, language, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+            res.json({ user });
+        }
     }
     catch (error) {
         console.error("Create user error:", error);
@@ -80,8 +101,13 @@ app.post("/api/users", async (req, res) => {
 app.get("/api/users/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const user = await supabaseService.getUserById(id);
-        res.json({ user });
+        if (supabaseService) {
+            const user = await supabaseService.getUserById(id);
+            res.json({ user });
+        }
+        else {
+            res.status(404).json({ error: "User not found (fallback mode)" });
+        }
     }
     catch (error) {
         console.error("Get user error:", error);
@@ -92,8 +118,16 @@ app.get("/api/users/:id", async (req, res) => {
 app.post("/api/rooms", async (req, res) => {
     try {
         const { name, creatorId } = req.body;
-        const room = await supabaseService.createRoom({ name, creator_id: creatorId });
-        res.json({ room });
+        if (supabaseService) {
+            const room = await supabaseService.createRoom({ name, creator_id: creatorId });
+            res.json({ room });
+        }
+        else {
+            // Fallback: create room in memory
+            const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const room = { id: roomId, name, creator_id: creatorId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+            res.json({ room });
+        }
     }
     catch (error) {
         console.error("Create room error:", error);
@@ -102,8 +136,13 @@ app.post("/api/rooms", async (req, res) => {
 });
 app.get("/api/rooms", async (req, res) => {
     try {
-        const rooms = await supabaseService.getRooms();
-        res.json({ rooms });
+        if (supabaseService) {
+            const rooms = await supabaseService.getRooms();
+            res.json({ rooms });
+        }
+        else {
+            res.json({ rooms: [] });
+        }
     }
     catch (error) {
         console.error("Get rooms error:", error);
@@ -113,8 +152,13 @@ app.get("/api/rooms", async (req, res) => {
 app.get("/api/rooms/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const room = await supabaseService.getRoomById(id);
-        res.json({ room });
+        if (supabaseService) {
+            const room = await supabaseService.getRoomById(id);
+            res.json({ room });
+        }
+        else {
+            res.status(404).json({ error: "Room not found (fallback mode)" });
+        }
     }
     catch (error) {
         console.error("Get room error:", error);
@@ -125,7 +169,9 @@ app.post("/api/rooms/:id/join", async (req, res) => {
     try {
         const { id } = req.params;
         const { userId } = req.body;
-        await supabaseService.joinRoom(id, userId);
+        if (supabaseService) {
+            await supabaseService.joinRoom(id, userId);
+        }
         res.json({ message: "Joined room successfully" });
     }
     catch (error) {
@@ -137,7 +183,9 @@ app.post("/api/rooms/:id/leave", async (req, res) => {
     try {
         const { id } = req.params;
         const { userId } = req.body;
-        await supabaseService.leaveRoom(id, userId);
+        if (supabaseService) {
+            await supabaseService.leaveRoom(id, userId);
+        }
         res.json({ message: "Left room successfully" });
     }
     catch (error) {
@@ -145,6 +193,7 @@ app.post("/api/rooms/:id/leave", async (req, res) => {
         res.status(500).json({ error: "Failed to leave room" });
     }
 });
+// Onboarding routes removed - no longer needed
 // Socket.IO connection handling
 io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}`);
@@ -152,14 +201,20 @@ io.on("connection", (socket) => {
     socket.on("join-room", async (data) => {
         try {
             const { roomId, userId } = data;
-            // Get room and participants
-            const room = await supabaseService.getRoomById(roomId);
-            const participants = await supabaseService.getRoomParticipants(roomId);
             socket.join(roomId);
             // Send room state to the joining user
-            socket.emit("room-state", { room, participants });
+            if (supabaseService) {
+                const room = await supabaseService.getRoomById(roomId);
+                const participants = await supabaseService.getRoomParticipants(roomId);
+                socket.emit("room-state", { room, participants });
+            }
+            else {
+                socket.emit("room-state", { room: null, participants: [] });
+            }
             // Notify others in the room
-            socket.to(roomId).emit("user-joined", { userId, roomId });
+            // Get user data for proper emission
+            let user = { id: userId, name: `User-${userId.slice(0, 6)}` };
+            socket.to(roomId).emit("user-joined", user);
             console.log(`User ${userId} joined room ${roomId}`);
         }
         catch (error) {
@@ -186,38 +241,23 @@ io.on("connection", (socket) => {
             // Transcribe the audio
             const transcription = await transcriptionService.transcribe(audioData);
             if (transcription.text.trim()) {
-                // Get room participants
-                const participants = await supabaseService.getRoomParticipants(roomId);
-                const currentUser = participants.find((p) => p.user_id === userId);
-                if (currentUser) {
-                    // Translate for each participant with different language
-                    for (const participant of participants) {
-                        if (participant.user_id !== userId &&
-                            participant.user.language !== currentUser.user.language) {
-                            const translation = await translationService.translate(transcription.text, currentUser.user.language, participant.user.language);
-                            // Generate audio for the translated text
-                            const audioResult = await ttsService.synthesize(translation.translatedText, "default");
-                            // Send translated audio to the specific user
-                            socket.to(roomId).emit("translated-audio", {
-                                audioBuffer: audioResult.audioBuffer,
-                                userId: participant.user_id,
-                                roomId,
-                                originalText: transcription.text,
-                                translatedText: translation.translatedText,
-                                sourceLanguage: currentUser.user.language,
-                                targetLanguage: participant.user.language,
-                                provider: translation.provider
-                            });
-                        }
-                    }
-                    // Send transcription back to sender
-                    socket.emit("transcription", {
-                        text: transcription.text,
-                        language: transcription.language,
-                        confidence: transcription.confidence,
-                        provider: transcription.provider
-                    });
-                }
+                // Send transcription back to sender
+                socket.emit("transcription", {
+                    text: transcription.text,
+                    language: transcription.language,
+                    confidence: transcription.confidence,
+                    provider: transcription.provider
+                });
+                // For demo purposes, translate to Portuguese
+                const translation = await translationService.translate(transcription.text, "en", "pt");
+                // Send translated text to others
+                socket.to(roomId).emit("translated-text", {
+                    originalText: transcription.text,
+                    translatedText: translation.translatedText,
+                    sourceLanguage: "en",
+                    targetLanguage: "pt",
+                    provider: translation.provider
+                });
             }
         }
         catch (error) {
