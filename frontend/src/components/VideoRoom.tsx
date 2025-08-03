@@ -238,12 +238,36 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       
       if (state === 'failed' || state === 'disconnected') {
         console.log(`[peer] ❌ Connection with ${targetUserId} ${state}`);
+        
+        // Set a timeout to remove user if connection doesn't recover
         setTimeout(() => {
-          if (isComponentMountedRef.current) {
-            // Try to reconnect
-            console.log(`[peer] 🔄 Attempting to reconnect to ${targetUserId}`);
+          if (isComponentMountedRef.current && pc.connectionState === 'failed') {
+            console.log(`[peer] 🗑️ Removing user ${targetUserId} due to persistent connection failure`);
+            
+            // Stop all tracks from this peer
+            const receivers = pc.getReceivers();
+            receivers.forEach(receiver => {
+              if (receiver.track) {
+                receiver.track.stop();
+              }
+            });
+            
+            // Close the peer connection
+            pc.close();
+            
+            // Remove from peer connections
+            peerConnectionsRef.current.delete(targetUserId);
+            setPeerConnections(prev => prev.filter(conn => conn.userId !== targetUserId));
+            
+            // Remove from users in room
+            setUsersInRoom(prev => prev.filter(user => user.id !== targetUserId));
+            
+            // Clean up answers received reference
+            answersReceivedRef.current.delete(targetUserId);
+            
+            console.log(`[peer] ✅ User ${targetUserId} completely removed from room`);
           }
-        }, 2000);
+        }, 10000); // Wait 10 seconds before removing
       }
     };
 
@@ -251,9 +275,42 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     pc.oniceconnectionstatechange = () => {
       if (!isComponentMountedRef.current) return;
       
-      logger.log(`[ICE] Estado ICE com ${targetUserId}: ${pc.iceConnectionState}`);
-      if (pc.iceConnectionState === 'failed') {
-        logger.error(`[ICE] ❌ Conexão ICE falhou com ${targetUserId}`);
+      const iceState = pc.iceConnectionState;
+      logger.log(`[ICE] Estado ICE com ${targetUserId}: ${iceState}`);
+      
+      if (iceState === 'failed' || iceState === 'disconnected') {
+        logger.error(`[ICE] ❌ Conexão ICE ${iceState} com ${targetUserId}`);
+        
+        // If ICE fails, set a shorter timeout to remove the user
+        setTimeout(() => {
+          if (isComponentMountedRef.current && 
+              (pc.iceConnectionState === 'failed' || pc.connectionState === 'failed')) {
+            console.log(`[ICE] 🗑️ Removing user ${targetUserId} due to ICE connection failure`);
+            
+            // Stop all tracks from this peer
+            const receivers = pc.getReceivers();
+            receivers.forEach(receiver => {
+              if (receiver.track) {
+                receiver.track.stop();
+              }
+            });
+            
+            // Close the peer connection
+            pc.close();
+            
+            // Remove from peer connections
+            peerConnectionsRef.current.delete(targetUserId);
+            setPeerConnections(prev => prev.filter(conn => conn.userId !== targetUserId));
+            
+            // Remove from users in room
+            setUsersInRoom(prev => prev.filter(user => user.id !== targetUserId));
+            
+            // Clean up answers received reference
+            answersReceivedRef.current.delete(targetUserId);
+            
+            console.log(`[ICE] ✅ User ${targetUserId} completely removed from room due to ICE failure`);
+          }
+        }, 5000); // Wait 5 seconds for ICE failures (shorter than connection state)
       }
     };
 
