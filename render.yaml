@@ -13,4 +13,5 @@ services:
         value: 10000
       - key: FRONTEND_URL
         value: https://video-translate-app.vercel.app
-    healthCheckPath: /api/health# Deploy triggered at Sun Aug  3 13:36:05 -03 2025
+    healthCheckPath: /api/health
+# Deploy triggered at Sun Aug  3 13:36:05 -03 2025
