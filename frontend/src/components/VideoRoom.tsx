@@ -366,7 +366,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     } catch (error) {
       console.error('[FATAL] ❌ Erro ao criar offer para novo usuário:', error);
     }
-  }, [createPeerConnection]);
+  }, [createPeerConnection, peerConnections]);
 
   // Handle incoming offer
   const handleOffer = useCallback(async (data: { from: string; offer: RTCSessionDescriptionInit }) => {
@@ -431,7 +431,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     } catch (error) {
       console.error(`[TEST-LOG] ❌ Error handling offer from ${data.from}:`, error);
     }
-  }, [createPeerConnection]);
+  }, []);
 
   // Handle incoming answer
   const handleAnswer = useCallback(async (data: { from: string; answer: RTCSessionDescriptionInit }) => {
@@ -816,15 +816,15 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       
       // Close peer connections safely
       try {
-        const peerConnections = peerConnectionsRef.current;
-        peerConnections.forEach((pc, userId) => {
+        const currentPeerConnections = peerConnectionsRef.current;
+        currentPeerConnections.forEach((pc, userId) => {
           try {
             pc.close();
           } catch (error) {
             console.warn(`Error closing peer connection for ${userId}:`, error);
           }
         });
-        peerConnections.clear();
+        currentPeerConnections.clear();
       } catch (error) {
         console.warn('Error during peer connections cleanup:', error);
       }
