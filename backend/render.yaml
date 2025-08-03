@@ -3,11 +3,13 @@ services:
     name: video-translate-backend
     env: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         generateValue: true
+      - key: FRONTEND_URL
+        value: https://video-translate-app.vercel.app
     healthCheckPath: /api/health
