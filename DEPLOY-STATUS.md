@@ -16,7 +16,8 @@
 
 ### Frontend (Vercel)
 - **URL**: https://video-translate-app.vercel.app
-- **Status**: ✅ Funcionando
+- **Status**: ✅ FUNCIONANDO EM PRODUÇÃO
+- **Deploy**: ✅ Concluído com sucesso
 - **Recursos**: Interface completa, Socket.IO com polling
 - **Limitação**: WebSocket não suportado (usa polling)
 
@@ -27,7 +28,7 @@
 
 ### API Vercel (Temporário)
 - **URL**: https://video-translate-app.vercel.app/api
-- **Status**: ✅ Funcionando
+- **Status**: ✅ Funcionando como fallback
 - **Recursos**: Socket.IO com polling apenas
 - **Uso**: Solução temporária até Render estar configurado
 
@@ -35,9 +36,10 @@
 
 ### Backend Render
 - **URL Esperada**: https://video-translate-backend.onrender.com
-- **Status**: ❌ Serviço não criado
-- **Problema**: GitHub Actions executa mas serviço não existe no Render
-- **Solução**: Configuração manual necessária (ver setup-render.md)
+- **Status**: ⏳ Aguardando configuração manual
+- **Deploy**: ✅ GitHub Actions configurado e executado
+- **Problema**: Serviço precisa ser criado manualmente no dashboard
+- **Solução**: Seguir RENDER-MANUAL-SETUP.md
 
 ## 📋 Configurações Atuais
 
