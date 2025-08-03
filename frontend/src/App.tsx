@@ -16,8 +16,8 @@ function App() {
       console.log('✅ Found roomId in URL, joining room:', roomFromUrl);
       setCurrentRoom(roomFromUrl);
       setIsJoiningFromUrl(true);
-      // Remove the roomId parameter from URL to clean it up
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // CORREÇÃO: NÃO remover o roomId da URL para permitir compartilhamento
+      // window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
