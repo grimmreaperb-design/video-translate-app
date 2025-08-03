@@ -9,7 +9,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.socket.io https://unpkg.com https://cdn.jsdelivr.net; connect-src 'self' https://video-translate-app.onrender.com wss://video-translate-app.onrender.com https://api.libretranslate.com ws: wss:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob: 'unsafe-eval'; object-src 'none'; base-uri 'self';"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.socket.io https://unpkg.com https://cdn.jsdelivr.net; connect-src 'self' https://video-translate-backend-wv9b.onrender.com wss://video-translate-backend-wv9b.onrender.com https://api.libretranslate.com ws: wss:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: 'unsafe-eval'; object-src 'none'; base-uri 'self';"
         }
       ]
     }
