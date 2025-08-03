@@ -31,9 +31,15 @@
             status.textContent = 'Connected';
             status.style.color = 'green';
             
-            // Test joining a room
-            socket.emit('join-room', 'test-room-123');
-            log('🏠 Emitted join-room event');
+            // Test joining a room with correct format
+            socket.emit('join-room', {
+                roomId: 'test-room-123',
+                user: {
+                    id: socket.id,
+                    name: `TestUser-${socket.id.slice(0, 6)}`
+                }
+            });
+            log('🏠 Emitted join-room event with user object');
         });
         
         socket.on('disconnect', (reason) => {
@@ -52,8 +58,13 @@
             log('👥 Room users: ' + JSON.stringify(users));
         });
         
-        socket.on('user-joined', (userId) => {
-            log('👋 User joined: ' + userId);
+        socket.on('user-joined', (newUser) => {
+            log('👋 User joined: ' + JSON.stringify(newUser));
+            if (!newUser || !newUser.id || !newUser.name) {
+                log('❌ Invalid user data received: ' + JSON.stringify(newUser));
+            } else {
+                log('✅ Valid user data: ' + newUser.name + ' (' + newUser.id + ')');
+            }
         });
     </script>
 </body>
