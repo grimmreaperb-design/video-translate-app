@@ -16,10 +16,14 @@
 
 ### Frontend (Vercel)
 - **URL**: https://video-translate-app.vercel.app
-- **Status**: ✅ FUNCIONANDO EM PRODUÇÃO
-- **Deploy**: ✅ Concluído com sucesso
+- **Status**: ✅ FUNCIONANDO EM PRODUÇÃO (CORRIGIDO)
+- **Deploy**: ✅ Concluído com correções de socket
 - **Recursos**: Interface completa, Socket.IO com polling
 - **Limitação**: WebSocket não suportado (usa polling)
+- **Correções Aplicadas**:
+  - ✅ URLs de socket inválidas removidas
+  - ✅ Validação de URLs implementada
+  - ✅ Configuração de ambiente corrigida (.env.local criado)
 
 ### Backend Local
 - **URL**: http://localhost:3002
