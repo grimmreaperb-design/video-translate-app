@@ -671,50 +671,57 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         }
       });
 
-      socket.on('user-joined', async (userData: any) => {
+      socket.on('user-joined', async (newUser: any) => {
         if (!isComponentMountedRef.current) return;
         
         try {
+          console.log('[USER-JOIN] Novo usuário recebido:', newUser);
+          
+          if (!newUser || !newUser.id || !newUser.name) {
+            console.error('[USER-JOIN] ❌ Invalid user data in user-joined event:', JSON.stringify(newUser));
+            return; // não processa dados inválidos
+          }
+          
           forceLog(`[USER-JOIN] 🔥 STEP 1: User joined event received in room ${roomId}`, 'warn');
-          forceLog(`[USER-JOIN] 📦 Raw data received: ${JSON.stringify(userData)}`, 'warn');
-          forceLog(`[USER-JOIN] 🔍 Data type: ${typeof userData}`, 'warn');
+          forceLog(`[USER-JOIN] 📦 Raw data received: ${JSON.stringify(newUser)}`, 'warn');
+          forceLog(`[USER-JOIN] 🔍 Data type: ${typeof newUser}`, 'warn');
           
           // Robust validation for user data
           let user: User | null = null;
           
-          // Case 1: userData is already a proper User object
-          if (userData && typeof userData === 'object' && userData.id && userData.name) {
-            user = { id: userData.id, name: userData.name };
+          // Case 1: newUser is already a proper User object
+          if (newUser && typeof newUser === 'object' && newUser.id && newUser.name) {
+            user = { id: newUser.id, name: newUser.name };
             forceLog(`[USER-JOIN] ✅ Valid user object received: ${user.name} (${user.id})`, 'warn');
           }
-          // Case 2: userData is just a string (legacy format - user ID only)
-          else if (typeof userData === 'string' && userData.trim()) {
-            user = { id: userData, name: `User-${userData.slice(0, 6)}` };
+          // Case 2: newUser is just a string (legacy format - user ID only)
+          else if (typeof newUser === 'string' && newUser.trim()) {
+            user = { id: newUser, name: `User-${newUser.slice(0, 6)}` };
             forceLog(`[USER-JOIN] 🔄 Legacy format detected, created user: ${user.name} (${user.id})`, 'warn');
           }
-          // Case 3: userData is an object but missing required fields
-          else if (userData && typeof userData === 'object') {
-            if (userData.id && !userData.name) {
-              user = { id: userData.id, name: `User-${userData.id.slice(0, 6)}` };
+          // Case 3: newUser is an object but missing required fields
+          else if (newUser && typeof newUser === 'object') {
+            if (newUser.id && !newUser.name) {
+              user = { id: newUser.id, name: `User-${newUser.id.slice(0, 6)}` };
               forceLog(`[USER-JOIN] 🔧 Missing name, generated: ${user.name} (${user.id})`, 'warn');
-            } else if (userData.name && !userData.id) {
+            } else if (newUser.name && !newUser.id) {
               // Generate ID from name or timestamp
-              const generatedId = `${userData.name.replace(/\s+/g, '_')}_${Date.now()}`;
-              user = { id: generatedId, name: userData.name };
+              const generatedId = `${newUser.name.replace(/\s+/g, '_')}_${Date.now()}`;
+              user = { id: generatedId, name: newUser.name };
               forceLog(`[USER-JOIN] 🔧 Missing ID, generated: ${user.name} (${user.id})`, 'warn');
             } else {
-              forceLog(`[USER-JOIN] ❌ Object missing both id and name: ${JSON.stringify(userData)}`, 'error');
+              forceLog(`[USER-JOIN] ❌ Object missing both id and name: ${JSON.stringify(newUser)}`, 'error');
             }
           }
           // Case 4: Invalid data - log and ignore
           else {
-            forceLog(`[USER-JOIN] ❌ Invalid user data type or empty: ${JSON.stringify(userData)} (type: ${typeof userData})`, 'error');
+            forceLog(`[USER-JOIN] ❌ Invalid user data type or empty: ${JSON.stringify(newUser)} (type: ${typeof newUser})`, 'error');
             return;
           }
           
           // Final validation
           if (!user || !user.id || !user.name) {
-            forceLog(`[USER-JOIN] ❌ Failed to create valid user object from: ${JSON.stringify(userData)}`, 'error');
+            forceLog(`[USER-JOIN] ❌ Failed to create valid user object from: ${JSON.stringify(newUser)}`, 'error');
             return;
           }
           

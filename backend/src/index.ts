@@ -89,6 +89,13 @@ io.on('connection', (socket) => {
     } else {
       roomId = data.roomId;
       user = data.user;
+      
+      // Garantir user válido
+      if (!user || !user.id || !user.name) {
+        user = { id: socket.id, name: `User-${socket.id.slice(0, 6)}` };
+        console.log(`[TEST-LOG-BACKEND] ⚠️ Invalid user data received, using fallback: ${user.name} (${user.id})`);
+      }
+      
       console.log(`[TEST-LOG-BACKEND] 📝 New format - User ${user.name} (${user.id}) joining room ${roomId}`);
     }
     
@@ -138,18 +145,14 @@ io.on('connection', (socket) => {
     socket.emit('room-users', currentUsers);
     console.log(`[TEST-LOG-BACKEND] 📤 Sent room-users event to new user ${user.name} with ${currentUsers.length} existing users`);
     
-    // Envio do evento 'user-joined' com objeto completo do usuário
-    const currentUsersInRoom = Array.from(room).map(socketId => socketUsers.get(socketId)).filter(Boolean);
-    const joinedUser = currentUsersInRoom.find(u => u!.id === user.id);
-    
-    if (joinedUser) {
-      console.log("Emitindo user-joined para sala", roomId, "com usuário:", joinedUser);
-      socket.to(roomId).emit('user-joined', joinedUser);
-      console.log(`[TEST-LOG-BACKEND] 🔥 STEP 1-BACKEND: Notified ${room.size - 1} users in room ${roomId} about new user: ${joinedUser.name} (${joinedUser.id})`);
+    // Notifica os outros na sala sobre o novo usuário
+    if (user && user.id && user.name) {
+      const userToEmit = { id: user.id, name: user.name };
+      console.log("Emitindo user-joined para sala", roomId, "com usuário:", userToEmit);
+      socket.to(roomId).emit('user-joined', userToEmit);
+      console.log(`[TEST-LOG-BACKEND] 🔥 STEP 1-BACKEND: Notified ${room.size - 1} users in room ${roomId} about new user: ${userToEmit.name} (${userToEmit.id})`);
     } else {
-      console.log("Emitindo user-joined para sala", roomId, "com usuário:", user);
-      socket.to(roomId).emit('user-joined', user);
-      console.warn(`[TEST-LOG-BACKEND] ⚠️ WARN: Could not find full user data to emit user-joined for user ${user.name} (${user.id}), sending original user data.`);
+      console.warn(`[WARN] Tentativa de emitir user-joined com dados inválidos:`, user);
     }
     
     console.log(`[TEST-LOG-BACKEND] ✅ Room ${roomId} now has ${room.size} users total`);
