@@ -144,4 +144,4 @@ Após confirmar que a videochamada básica está funcionando, podemos adicionar:
 
 3. **Socket.IO não conecta**
    - Verifique a URL do backend
-   - Confirme se o CORS está configurado corretamente
+   - Confirme se o CORS está configurado corretamente# Deploy trigger Sun Aug  3 15:10:28 -03 2025
