@@ -5,14 +5,18 @@ import VideoRoom from './components/VideoRoom';
 function App() {
   const [currentRoom, setCurrentRoom] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('');
+  const [isJoiningFromUrl, setIsJoiningFromUrl] = useState<boolean>(false);
 
   useEffect(() => {
-    // Check if there's a room parameter in the URL
+    // Check if there's a roomId parameter in the URL
     const urlParams = new URLSearchParams(window.location.search);
-    const roomFromUrl = urlParams.get('room');
+    const roomFromUrl = urlParams.get('roomId');
+    console.log('🔍 Checking URL for roomId:', roomFromUrl);
     if (roomFromUrl) {
+      console.log('✅ Found roomId in URL, joining room:', roomFromUrl);
       setCurrentRoom(roomFromUrl);
-      // Remove the room parameter from URL to clean it up
+      setIsJoiningFromUrl(true);
+      // Remove the roomId parameter from URL to clean it up
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -22,9 +26,16 @@ function App() {
   };
 
   const handleStartCall = (name: string) => {
-    const roomId = generateRoomId();
-    setCurrentRoom(roomId);
-    setUserName(name);
+    if (isJoiningFromUrl && currentRoom) {
+      // Joining existing room from URL
+      setUserName(name);
+      setIsJoiningFromUrl(false);
+    } else {
+      // Creating new room
+      const roomId = generateRoomId();
+      setCurrentRoom(roomId);
+      setUserName(name);
+    }
   };
 
   const handleLeaveRoom = () => {
@@ -39,9 +50,9 @@ function App() {
       </header>
       
       <main>
-        {!currentRoom ? (
+        {!currentRoom || (currentRoom && !userName) ? (
           <div className="join-form">
-            <h2>Iniciar Videochamada</h2>
+            <h2>{isJoiningFromUrl ? `Entrar na Sala ${currentRoom}` : 'Iniciar Videochamada'}</h2>
             <form onSubmit={(e) => {
               e.preventDefault();
               const formData = new FormData(e.target as HTMLFormElement);
@@ -60,7 +71,7 @@ function App() {
                   placeholder="Digite seu nome"
                 />
               </div>
-              <button type="submit">Iniciar</button>
+              <button type="submit">{isJoiningFromUrl ? 'Entrar na Sala' : 'Iniciar'}</button>
             </form>
           </div>
         ) : (

@@ -133,6 +133,7 @@ io.on('connection', (socket) => {
     
     // Notify others about the new user
     socket.to(roomId).emit('user-joined', user);
+    console.log(`[TEST-LOG-BACKEND] 🔥 STEP 1-BACKEND: Notified existing users in room ${roomId} about new user: ${user.name} (${user.id})`);
     
     console.log(`Room ${roomId} now has ${room.size} users`);
   });
@@ -167,11 +168,12 @@ io.on('connection', (socket) => {
     if (user) {
       const targetSocketId = userSockets.get(data.to);
       if (targetSocketId) {
+        console.log(`[TEST-LOG-BACKEND] 🔥 STEP 2-BACKEND: Offer from ${socket.id} to ${data.to}`);
         io.to(targetSocketId).emit('webrtc-offer', {
           offer: data.offer,
           from: user.id
         });
-        console.log(`WebRTC Offer sent from ${user.id} to ${data.to}`);
+        console.log(`[TEST-LOG-BACKEND] ✅ Offer forwarded to ${data.to}`);
       }
     }
   });
@@ -182,11 +184,12 @@ io.on('connection', (socket) => {
     if (user) {
       const targetSocketId = userSockets.get(data.to);
       if (targetSocketId) {
+        console.log(`[TEST-LOG-BACKEND] 🔥 STEP 5-BACKEND: Answer from ${socket.id} to ${data.to}`);
         io.to(targetSocketId).emit('webrtc-answer', {
           answer: data.answer,
           from: user.id
         });
-        console.log(`WebRTC Answer sent from ${user.id} to ${data.to}`);
+        console.log(`[TEST-LOG-BACKEND] ✅ Answer forwarded to ${data.to}`);
       }
     }
   });
@@ -197,11 +200,12 @@ io.on('connection', (socket) => {
     if (user) {
       const targetSocketId = userSockets.get(data.to);
       if (targetSocketId) {
+        console.log(`[TEST-LOG-BACKEND] 🔥 STEP 7-BACKEND: ICE candidate from ${socket.id} to ${data.to}`);
         io.to(targetSocketId).emit('webrtc-ice-candidate', {
           candidate: data.candidate,
           from: user.id
         });
-        console.log(`WebRTC ICE candidate sent from ${user.id} to ${data.to}`);
+        console.log(`[TEST-LOG-BACKEND] ✅ ICE candidate forwarded to ${data.to}`);
       }
     }
   });

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste WebRTC - Dois Usuários</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .user-section { border: 2px solid #ccc; margin: 20px 0; padding: 20px; }
+        .user1 { border-color: #4CAF50; }
+        .user2 { border-color: #2196F3; }
+        .logs { background: #f5f5f5; padding: 10px; height: 300px; overflow-y: scroll; font-family: monospace; font-size: 12px; }
+        button { padding: 10px 20px; margin: 5px; }
+        .status { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🔥 Teste WebRTC - Dois Usuários</h1>
+    
+    <div class="user-section user1">
+        <h2>👤 Usuário 1 (Alice)</h2>
+        <button onclick="connectUser1()">Conectar Alice</button>
+        <button onclick="disconnectUser1()">Desconectar Alice</button>
+        <div class="status" id="status1">Desconectado</div>
+        <div class="logs" id="logs1"></div>
+    </div>
+    
+    <div class="user-section user2">
+        <h2>👤 Usuário 2 (Bob)</h2>
+        <button onclick="connectUser2()">Conectar Bob</button>
+        <button onclick="disconnectUser2()">Desconectar Bob</button>
+        <div class="status" id="status2">Desconectado</div>
+        <div class="logs" id="logs2"></div>
+    </div>
+    
+    <div>
+        <button onclick="runFullTest()">🚀 Executar Teste Completo</button>
+        <button onclick="clearLogs()">🧹 Limpar Logs</button>
+    </div>
+
+    <script>
+        let socket1, socket2;
+        const roomId = 'test-room-' + Date.now();
+        
+        function log(userId, message) {
+            const logsDiv = document.getElementById(`logs${userId}`);
+            const timestamp = new Date().toLocaleTimeString();
+            logsDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(`[USER${userId}] ${message}`);
+        }
+        
+        function updateStatus(userId, status) {
+            document.getElementById(`status${userId}`).textContent = status;
+        }
+        
+        function connectUser1() {
+            if (socket1) return;
+            
+            updateStatus(1, 'Conectando...');
+            log(1, '🔌 Conectando ao servidor...');
+            
+            socket1 = io('http://localhost:3001');
+            
+            socket1.on('connect', () => {
+                log(1, '✅ Conectado ao servidor');
+                updateStatus(1, 'Conectado');
+                
+                // Join room
+                socket1.emit('join-room', {
+                    roomId: roomId,
+                    user: { id: 'alice-123', name: 'Alice' }
+                });
+                log(1, `🚪 Entrando na sala: ${roomId}`);
+            });
+            
+            socket1.on('user-joined', (user) => {
+                log(1, `[TEST-LOG] 🔥 STEP 1: User joined event received: ${user.name} (${user.id})`);
+            });
+            
+            socket1.on('room-users', (users) => {
+                log(1, `👥 Usuários na sala: ${users.map(u => u.name).join(', ')}`);
+            });
+            
+            socket1.on('webrtc-offer', (data) => {
+                log(1, `[TEST-LOG] 🔥 STEP 3: Received offer from ${data.from}`);
+            });
+            
+            socket1.on('webrtc-answer', (data) => {
+                log(1, `[TEST-LOG] 🔥 STEP 6: Received answer from ${data.from}`);
+            });
+            
+            socket1.on('webrtc-ice-candidate', (data) => {
+                log(1, `[TEST-LOG] 🔥 STEP 7b: Received ICE candidate from ${data.from}`);
+            });
+            
+            socket1.on('disconnect', () => {
+                log(1, '❌ Desconectado do servidor');
+                updateStatus(1, 'Desconectado');
+            });
+        }
+        
+        function connectUser2() {
+            if (socket2) return;
+            
+            updateStatus(2, 'Conectando...');
+            log(2, '🔌 Conectando ao servidor...');
+            
+            socket2 = io('http://localhost:3001');
+            
+            socket2.on('connect', () => {
+                log(2, '✅ Conectado ao servidor');
+                updateStatus(2, 'Conectado');
+                
+                // Join room after a small delay
+                setTimeout(() => {
+                    socket2.emit('join-room', {
+                        roomId: roomId,
+                        user: { id: 'bob-456', name: 'Bob' }
+                    });
+                    log(2, `🚪 Entrando na sala: ${roomId}`);
+                }, 1000);
+            });
+            
+            socket2.on('user-joined', (user) => {
+                log(2, `[TEST-LOG] 🔥 STEP 1: User joined event received: ${user.name} (${user.id})`);
+            });
+            
+            socket2.on('room-users', (users) => {
+                log(2, `👥 Usuários na sala: ${users.map(u => u.name).join(', ')}`);
+            });
+            
+            socket2.on('webrtc-offer', (data) => {
+                log(2, `[TEST-LOG] 🔥 STEP 3: Received offer from ${data.from}`);
+                
+                // Simulate answer
+                setTimeout(() => {
+                    log(2, `[TEST-LOG] 🔥 STEP 4: Creating answer for ${data.from}`);
+                    socket2.emit('webrtc-answer', {
+                        to: data.from,
+                        answer: { type: 'answer', sdp: 'fake-answer-sdp' }
+                    });
+                    log(2, `[TEST-LOG] ✅ STEP 5: Answer sent to ${data.from}`);
+                }, 500);
+            });
+            
+            socket2.on('webrtc-answer', (data) => {
+                log(2, `[TEST-LOG] 🔥 STEP 6: Received answer from ${data.from}`);
+            });
+            
+            socket2.on('webrtc-ice-candidate', (data) => {
+                log(2, `[TEST-LOG] 🔥 STEP 7b: Received ICE candidate from ${data.from}`);
+            });
+            
+            socket2.on('disconnect', () => {
+                log(2, '❌ Desconectado do servidor');
+                updateStatus(2, 'Desconectado');
+            });
+        }
+        
+        function disconnectUser1() {
+            if (socket1) {
+                socket1.disconnect();
+                socket1 = null;
+                updateStatus(1, 'Desconectado');
+            }
+        }
+        
+        function disconnectUser2() {
+            if (socket2) {
+                socket2.disconnect();
+                socket2 = null;
+                updateStatus(2, 'Desconectado');
+            }
+        }
+        
+        function runFullTest() {
+            clearLogs();
+            log(1, '🚀 Iniciando teste completo...');
+            log(2, '🚀 Iniciando teste completo...');
+            
+            // Connect Alice first
+            connectUser1();
+            
+            // Connect Bob after 2 seconds
+            setTimeout(() => {
+                connectUser2();
+            }, 2000);
+            
+            // Simulate offer creation from Alice to Bob
+            setTimeout(() => {
+                if (socket1) {
+                    log(1, '[TEST-LOG] 🔥 STEP 2: Creating offer for Bob');
+                    socket1.emit('webrtc-offer', {
+                        to: 'bob-456',
+                        offer: { type: 'offer', sdp: 'fake-offer-sdp' }
+                    });
+                    log(1, '[TEST-LOG] ✅ Offer sent to Bob');
+                }
+            }, 3000);
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs1').innerHTML = '';
+            document.getElementById('logs2').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

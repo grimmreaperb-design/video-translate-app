@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste WebRTC - Mock (Sem Câmera)</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .log { margin: 5px 0; padding: 5px; border-left: 3px solid #ccc; }
+        .success { border-color: #4CAF50; background: #f1f8e9; }
+        .error { border-color: #f44336; background: #ffebee; }
+        .info { border-color: #2196F3; background: #e3f2fd; }
+        .warning { border-color: #ff9800; background: #fff3e0; }
+        #logs { max-height: 500px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste WebRTC - Simulação Completa (Sem Câmera)</h1>
+    <p>Este teste simula dois usuários (Alice e Bob) fazendo uma negociação WebRTC completa sem usar câmeras reais.</p>
+    
+    <button onclick="startTest()">🚀 Iniciar Teste</button>
+    <button onclick="clearLogs()">🧹 Limpar Logs</button>
+    
+    <div id="logs"></div>
+    
+    <script>
+        let testRunning = false;
+        
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        // Mock MediaStream para simular vídeo sem usar câmera real
+        function createMockMediaStream() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 640;
+            canvas.height = 480;
+            const ctx = canvas.getContext('2d');
+            
+            // Desenhar um padrão colorido
+            ctx.fillStyle = '#' + Math.floor(Math.random()*16777215).toString(16);
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = '30px Arial';
+            ctx.fillText('Mock Video', 250, 240);
+            
+            return canvas.captureStream(30);
+        }
+
+        async function startTest() {
+            if (testRunning) {
+                log('⚠️ Teste já está rodando!', 'warning');
+                return;
+            }
+            
+            // Verificar se Socket.IO carregou
+            if (typeof io === 'undefined') {
+                log('❌ Erro: Socket.IO não carregou. Verifique sua conexão com a internet.', 'error');
+                return;
+            }
+            
+            testRunning = true;
+            clearLogs();
+            log('🚀 Iniciando teste de negociação WebRTC...', 'info');
+            log('✅ Socket.IO carregado com sucesso', 'success');
+            
+            try {
+                // Criar dois sockets - conectando diretamente ao backend
+                const socketAlice = io('http://localhost:3001');
+                const socketBob = io('http://localhost:3001');
+                
+                let alicePC = null;
+                let bobPC = null;
+                
+                // Configuração STUN/TURN
+                const rtcConfig = {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                };
+
+                // === ALICE ===
+                socketAlice.on('connect', () => {
+                    log('🟢 Alice conectada ao servidor', 'success');
+                    socketAlice.emit('join-room', {
+                        roomId: 'test-room-mock',
+                        user: { id: 'alice-mock-123', name: 'Alice (Mock)' }
+                    });
+                });
+
+                socketAlice.on('user-joined', async (user) => {
+                    if (user.id === 'bob-mock-456') {
+                        log(`🔥 Alice: Bob entrou na sala, criando oferta...`, 'info');
+                        
+                        // Criar PeerConnection para Alice
+                        alicePC = new RTCPeerConnection(rtcConfig);
+                        
+                        // Adicionar mock stream
+                        const mockStream = createMockMediaStream();
+                        mockStream.getTracks().forEach(track => {
+                            alicePC.addTrack(track, mockStream);
+                        });
+                        
+                        // Configurar eventos
+                        alicePC.onicecandidate = (event) => {
+                            if (event.candidate) {
+                                log('🧊 Alice: Enviando ICE candidate', 'info');
+                                socketAlice.emit('webrtc-ice-candidate', {
+                                    to: 'bob-mock-456',
+                                    candidate: event.candidate
+                                });
+                            }
+                        };
+                        
+                        alicePC.onconnectionstatechange = () => {
+                            log(`🔗 Alice: Connection state = ${alicePC.connectionState}`, 'info');
+                            if (alicePC.connectionState === 'connected') {
+                                log('✅ Alice: Conexão P2P estabelecida!', 'success');
+                            }
+                        };
+                        
+                        // Criar e enviar oferta
+                        const offer = await alicePC.createOffer();
+                        await alicePC.setLocalDescription(offer);
+                        
+                        socketAlice.emit('webrtc-offer', {
+                            to: 'bob-mock-456',
+                            offer: offer
+                        });
+                        log('📞 Alice: Oferta enviada para Bob', 'success');
+                    }
+                });
+
+                socketAlice.on('webrtc-answer', async (data) => {
+                    log('✅ Alice: Resposta recebida de Bob', 'success');
+                    if (alicePC) {
+                        await alicePC.setRemoteDescription(data.answer);
+                        log('🎯 Alice: Remote description definida', 'success');
+                    }
+                });
+
+                socketAlice.on('webrtc-ice-candidate', async (data) => {
+                    log('🧊 Alice: ICE candidate recebido de Bob', 'info');
+                    if (alicePC && data.candidate) {
+                        await alicePC.addIceCandidate(data.candidate);
+                    }
+                });
+
+                // === BOB ===
+                socketBob.on('connect', () => {
+                    log('🟢 Bob conectado ao servidor', 'success');
+                    // Bob entra 2 segundos depois
+                    setTimeout(() => {
+                        socketBob.emit('join-room', {
+                            roomId: 'test-room-mock',
+                            user: { id: 'bob-mock-456', name: 'Bob (Mock)' }
+                        });
+                        log('🏠 Bob: Entrando na sala...', 'info');
+                    }, 2000);
+                });
+
+                socketBob.on('webrtc-offer', async (data) => {
+                    log('📞 Bob: Oferta recebida de Alice', 'success');
+                    
+                    // Criar PeerConnection para Bob
+                    bobPC = new RTCPeerConnection(rtcConfig);
+                    
+                    // Adicionar mock stream
+                    const mockStream = createMockMediaStream();
+                    mockStream.getTracks().forEach(track => {
+                        bobPC.addTrack(track, mockStream);
+                    });
+                    
+                    // Configurar eventos
+                    bobPC.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            log('🧊 Bob: Enviando ICE candidate', 'info');
+                            socketBob.emit('webrtc-ice-candidate', {
+                                to: 'alice-mock-123',
+                                candidate: event.candidate
+                            });
+                        }
+                    };
+                    
+                    bobPC.onconnectionstatechange = () => {
+                        log(`🔗 Bob: Connection state = ${bobPC.connectionState}`, 'info');
+                        if (bobPC.connectionState === 'connected') {
+                            log('✅ Bob: Conexão P2P estabelecida!', 'success');
+                            log('🎉 SUCESSO: Negociação WebRTC completa!', 'success');
+                            testRunning = false;
+                        }
+                    };
+                    
+                    bobPC.ontrack = (event) => {
+                        log('📺 Bob: Stream de vídeo recebido de Alice', 'success');
+                    };
+                    
+                    // Processar oferta e criar resposta
+                    await bobPC.setRemoteDescription(data.offer);
+                    const answer = await bobPC.createAnswer();
+                    await bobPC.setLocalDescription(answer);
+                    
+                    socketBob.emit('webrtc-answer', {
+                        to: 'alice-mock-123',
+                        answer: answer
+                    });
+                    log('✅ Bob: Resposta enviada para Alice', 'success');
+                });
+
+                socketBob.on('webrtc-ice-candidate', async (data) => {
+                    log('🧊 Bob: ICE candidate recebido de Alice', 'info');
+                    if (bobPC && data.candidate) {
+                        await bobPC.addIceCandidate(data.candidate);
+                    }
+                });
+
+                // Timeout de segurança
+                setTimeout(() => {
+                    if (testRunning) {
+                        log('⏰ Timeout: Teste demorou mais que 30 segundos', 'error');
+                        testRunning = false;
+                    }
+                }, 30000);
+
+            } catch (error) {
+                log(`❌ Erro durante o teste: ${error.message}`, 'error');
+                testRunning = false;
+            }
+        }
+    </script>
+</body>
+</html>
