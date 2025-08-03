@@ -6,8 +6,20 @@ const cors = require("cors");
 const app = express();
 app.use(cors());
 
+app.get("/", (req, res) => {
+  res.json({ 
+    message: "Video Translate Backend is running!",
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || "development"
+  });
+});
+
 app.get("/api/health", (req, res) => {
-  res.send("OK");
+  res.json({ 
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
 });
 
 const server = http.createServer(app);
