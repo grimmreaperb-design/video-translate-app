@@ -366,9 +366,10 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     } catch (error) {
       console.error('[FATAL] ❌ Erro ao criar offer para novo usuário:', error);
     }
-  }, [createPeerConnection, peerConnections]);
+  }, [createPeerConnection]);
 
   // Handle incoming offer
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleOffer = useCallback(async (data: { from: string; offer: RTCSessionDescriptionInit }) => {
     try {
       console.log(`[TEST-LOG] 🔥 STEP 4: Received offer from ${data.from}`);
@@ -434,6 +435,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   }, []);
 
   // Handle incoming answer
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleAnswer = useCallback(async (data: { from: string; answer: RTCSessionDescriptionInit }) => {
     try {
       console.log(`[TEST-LOG] 🔥 STEP 6: Received answer from ${data?.from || 'undefined'}`);
@@ -495,6 +497,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   }, []);
 
   // Attempt reconnection with exponential backoff and URL fallback
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const attemptReconnection = useCallback(() => {
     if (!isComponentMountedRef.current || reconnectionRef.current.isReconnecting) return;
 
@@ -837,6 +840,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         console.warn('Error during state cleanup:', error);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, userName, initializeLocalMedia, initializeSocket, clearReconnectionTimeout]);
 
   const handleLeaveRoom = () => {
