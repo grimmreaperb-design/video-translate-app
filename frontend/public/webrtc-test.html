@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Teste WebRTC Minimalista</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .video-container {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        video {
+            width: 300px;
+            height: 200px;
+            background: #000;
+            border-radius: 8px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .logs {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.connecting { background: #fff3cd; color: #856404; }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste WebRTC Minimalista</h1>
+        <p>Este teste isolado verifica se o WebRTC funciona com o backend Socket.IO sem React.</p>
+        
+        <div class="status" id="status">🔄 Aguardando...</div>
+        
+        <div class="controls">
+            <button id="startBtn" onclick="startTest()">🚀 Iniciar Teste</button>
+            <button id="connectBtn" onclick="connectSocket()" disabled>🔌 Conectar Socket</button>
+            <button id="joinBtn" onclick="joinRoom()" disabled>🏠 Entrar na Sala</button>
+            <button id="clearBtn" onclick="clearLogs()">🧹 Limpar Logs</button>
+        </div>
+        
+        <div class="video-container">
+            <div>
+                <h3>📹 Vídeo Local</h3>
+                <video id="localVideo" autoplay muted></video>
+            </div>
+            <div>
+                <h3>📺 Vídeo Remoto</h3>
+                <video id="remoteVideo" autoplay></video>
+            </div>
+        </div>
+        
+        <div>
+            <h3>📋 Logs de Diagnóstico</h3>
+            <div class="logs" id="logs"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // 🔎 DIAGNÓSTICO PROFUNDO: Capturar erros silenciosos globalmente
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            log('[UNCAUGHT] ❌ window.onerror: ' + msg + ' at ' + url + ':' + lineNo + ':' + columnNo, 'error');
+        };
+
+        window.onunhandledrejection = function (event) {
+            log('[UNCAUGHT] ❌ Promise rejection: ' + event.reason, 'error');
+        };
+
+        // Variáveis globais
+        let socket = null;
+        let localStream = null;
+        let peerConnection = null;
+        let isInitiator = false;
+        const roomId = 'test-room-' + Date.now();
+        const userId = 'test-user-' + Date.now();
+
+        // Configuração ICE
+        const iceServers = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+        ];
+
+        // Função de log
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('logs');
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = 'status ' + type;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').textContent = '';
+        }
+
+        // 🔧 5. Verificar permissões de câmera/microfone explicitamente
+        async function startTest() {
+            try {
+                log('[PERMISSION] 🔍 Verificando permissões de mídia...');
+                updateStatus('🔄 Obtendo acesso à câmera e microfone...', 'connecting');
+                
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480 },
+                    audio: true
+                });
+                
+                log('[PERMISSION] ✅ Acesso à mídia concedido: ' + localStream.getTracks().map(t => t.kind).join(', '), 'success');
+                
+                const localVideo = document.getElementById('localVideo');
+                localVideo.srcObject = localStream;
+                
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('connectBtn').disabled = false;
+                
+                updateStatus('✅ Mídia local obtida com sucesso', 'connected');
+                
+            } catch (error) {
+                log('[PERMISSION] ❌ Erro ao acessar mídia: ' + error.message, 'error');
+                updateStatus('❌ Erro ao acessar câmera/microfone', 'error');
+            }
+        }
+
+        function connectSocket() {
+            try {
+                log('🔌 Conectando ao Socket.IO...');
+                updateStatus('🔄 Conectando ao servidor...', 'connecting');
+                
+                // Usar a mesma URL do backend em produção
+                socket = io('https://video-translate-app.onrender.com', {
+                    transports: ['websocket', 'polling'],
+                    timeout: 15000,
+                    forceNew: true,
+                    reconnection: false
+                });
+
+                socket.on('connect', () => {
+                    log('✅ Socket conectado com sucesso! ID: ' + socket.id, 'success');
+                    updateStatus('✅ Conectado ao servidor', 'connected');
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('joinBtn').disabled = false;
+                });
+
+                socket.on('disconnect', (reason) => {
+                    log('❌ Socket desconectado: ' + reason, 'error');
+                    updateStatus('❌ Desconectado do servidor', 'error');
+                });
+
+                socket.on('connect_error', (error) => {
+                    log('❌ Erro de conexão: ' + error.message, 'error');
+                    updateStatus('❌ Erro de conexão', 'error');
+                });
+
+                // Eventos WebRTC
+                socket.on('webrtc-offer', handleOffer);
+                socket.on('webrtc-answer', handleAnswer);
+                socket.on('webrtc-ice-candidate', handleIceCandidate);
+                socket.on('user-joined', handleUserJoined);
+
+            } catch (error) {
+                log('❌ Erro ao conectar socket: ' + error.message, 'error');
+                updateStatus('❌ Erro de conexão', 'error');
+            }
+        }
+
+        function joinRoom() {
+            try {
+                log('🏠 Entrando na sala: ' + roomId);
+                updateStatus('🔄 Entrando na sala...', 'connecting');
+                
+                socket.emit('join-room', {
+                    roomId: roomId,
+                    user: {
+                        id: userId,
+                        name: 'Test User'
+                    }
+                });
+                
+                log('✅ Solicitação de entrada na sala enviada', 'success');
+                updateStatus('✅ Na sala de teste', 'connected');
+                
+            } catch (error) {
+                log('❌ Erro ao entrar na sala: ' + error.message, 'error');
+                updateStatus('❌ Erro ao entrar na sala', 'error');
+            }
+        }
+
+        function createPeerConnection() {
+            try {
+                log('🔗 Criando peer connection...');
+                
+                peerConnection = new RTCPeerConnection({ iceServers });
+
+                // Adicionar tracks locais
+                if (localStream) {
+                    localStream.getTracks().forEach(track => {
+                        peerConnection.addTrack(track, localStream);
+                        log('✅ Track adicionado: ' + track.kind, 'success');
+                    });
+                }
+
+                // 🔧 3. Verificar o pc.oniceconnectionstatechange para detectar falhas
+                peerConnection.oniceconnectionstatechange = () => {
+                    log('[ICE] Estado ICE: ' + peerConnection.iceConnectionState);
+                    if (peerConnection.iceConnectionState === 'failed') {
+                        log('[ICE] ❌ Conexão ICE falhou', 'error');
+                    }
+                };
+
+                peerConnection.onconnectionstatechange = () => {
+                    log('[PEER] Estado da conexão: ' + peerConnection.connectionState);
+                };
+
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate && socket) {
+                        log('🧊 Enviando ICE candidate...');
+                        socket.emit('webrtc-ice-candidate', {
+                            to: 'remote-user',
+                            candidate: event.candidate
+                        });
+                    }
+                };
+
+                peerConnection.ontrack = (event) => {
+                    log('📹 Stream remoto recebido!', 'success');
+                    const remoteVideo = document.getElementById('remoteVideo');
+                    remoteVideo.srcObject = event.streams[0];
+                    
+                    // 🔧 4. Adicionar fallback de reconexão se ontrack não disparar
+                    setTimeout(() => {
+                        if (!remoteVideo.srcObject) {
+                            log('[TIMEOUT] 🔄 Nenhuma stream recebida após 5s', 'error');
+                        }
+                    }, 5000);
+                };
+
+                return peerConnection;
+
+            } catch (error) {
+                log('❌ Erro ao criar peer connection: ' + error.message, 'error');
+                return null;
+            }
+        }
+
+        async function handleUserJoined(user) {
+            try {
+                log('👤 Usuário entrou: ' + user.name + ' (' + user.id + ')');
+                
+                if (user.id === userId) {
+                    log('⚠️ Ignorando próprio usuário');
+                    return;
+                }
+
+                // 🔧 1. Verifique se há erro de execução ao adicionar o novo usuário
+                try {
+                    isInitiator = true;
+                    const pc = createPeerConnection();
+                    if (!pc) {
+                        log('❌ Falha ao criar peer connection', 'error');
+                        return;
+                    }
+
+                    log('📝 Criando offer...');
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    
+                    socket.emit('webrtc-offer', {
+                        to: user.id,
+                        offer: offer
+                    });
+                    
+                    log('✅ Offer enviado para ' + user.name, 'success');
+                    
+                } catch (error) {
+                    log('[FATAL] ❌ Erro ao criar offer para novo usuário: ' + error.message, 'error');
+                }
+
+            } catch (error) {
+                log('[FATAL] ❌ Erro no handler user-joined: ' + error.message, 'error');
+            }
+        }
+
+        async function handleOffer(data) {
+            try {
+                log('📨 Offer recebido de: ' + data.from);
+                
+                if (!peerConnection) {
+                    peerConnection = createPeerConnection();
+                }
+                
+                await peerConnection.setRemoteDescription(data.offer);
+                log('📌 Remote description definida');
+                
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                socket.emit('webrtc-answer', {
+                    to: data.from,
+                    answer: answer
+                });
+                
+                log('✅ Answer enviado', 'success');
+                
+            } catch (error) {
+                log('❌ Erro ao processar offer: ' + error.message, 'error');
+            }
+        }
+
+        async function handleAnswer(data) {
+            try {
+                log('📨 Answer recebido de: ' + data.from);
+                
+                if (peerConnection) {
+                    await peerConnection.setRemoteDescription(data.answer);
+                    log('✅ Answer processado', 'success');
+                } else {
+                    log('❌ Nenhuma peer connection encontrada para answer', 'error');
+                }
+                
+            } catch (error) {
+                log('❌ Erro ao processar answer: ' + error.message, 'error');
+            }
+        }
+
+        async function handleIceCandidate(data) {
+            try {
+                log('🧊 ICE candidate recebido de: ' + data.from);
+                
+                if (peerConnection) {
+                    await peerConnection.addIceCandidate(data.candidate);
+                    log('✅ ICE candidate adicionado', 'success');
+                } else {
+                    log('❌ Nenhuma peer connection encontrada para ICE candidate', 'error');
+                }
+                
+            } catch (error) {
+                log('❌ Erro ao processar ICE candidate: ' + error.message, 'error');
+            }
+        }
+
+        // Inicializar logs
+        log('🧪 Teste WebRTC Minimalista iniciado');
+        log('📋 Instruções:');
+        log('1. Clique em "Iniciar Teste" para obter acesso à câmera');
+        log('2. Clique em "Conectar Socket" para conectar ao servidor');
+        log('3. Clique em "Entrar na Sala" para entrar na sala de teste');
+        log('4. Abra esta página em outra aba/janela para testar P2P');
+        log('');
+        log('🔍 Room ID: ' + roomId);
+        log('🆔 User ID: ' + userId);
+    </script>
+</body>
+</html>

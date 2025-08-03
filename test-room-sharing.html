@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Compartilhamento de Sala</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        .url-box { background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0; word-break: break-all; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .info { background: #e7f3ff; padding: 15px; border-radius: 4px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste de Compartilhamento de Sala</h1>
+        
+        <div class="info">
+            <strong>Como testar:</strong>
+            <ol>
+                <li>Clique em "Gerar Nova Sala" para criar um roomId</li>
+                <li>Copie a URL gerada</li>
+                <li>Abra a URL em uma nova aba/janela</li>
+                <li>Verifique se ambas as abas mostram o mesmo roomId</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h2>🎲 Gerador de Sala</h2>
+            <button onclick="generateRoom()">Gerar Nova Sala</button>
+            <button onclick="clearRoom()">Limpar</button>
+            
+            <div id="roomInfo" style="display: none;">
+                <h3>📋 Informações da Sala:</h3>
+                <p><strong>Room ID:</strong> <span id="roomId"></span></p>
+                <p><strong>URL para Compartilhar:</strong></p>
+                <div class="url-box" id="shareUrl"></div>
+                <button onclick="copyUrl()">📋 Copiar URL</button>
+                <button onclick="openInNewTab()">🔗 Abrir em Nova Aba</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Informações Atuais</h2>
+            <p><strong>URL Atual:</strong> <span id="currentUrl"></span></p>
+            <p><strong>Room ID da URL:</strong> <span id="urlRoomId"></span></p>
+            <p><strong>Timestamp:</strong> <span id="timestamp"></span></p>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Teste de Geração de IDs</h2>
+            <button onclick="testIdGeneration()">Testar Geração de 10 IDs</button>
+            <div id="idResults"></div>
+        </div>
+    </div>
+
+    <script>
+        // Função para gerar roomId (mesma lógica do App.tsx)
+        function generateRoomId() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        // Atualizar informações atuais
+        function updateCurrentInfo() {
+            document.getElementById('currentUrl').textContent = window.location.href;
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomFromUrl = urlParams.get('roomId');
+            document.getElementById('urlRoomId').textContent = roomFromUrl || 'Nenhum';
+            
+            document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        }
+
+        // Gerar nova sala
+        function generateRoom() {
+            const roomId = generateRoomId();
+            const baseUrl = window.location.origin + window.location.pathname;
+            const shareUrl = `${baseUrl}?roomId=${roomId}`;
+            
+            document.getElementById('roomId').textContent = roomId;
+            document.getElementById('shareUrl').textContent = shareUrl;
+            document.getElementById('roomInfo').style.display = 'block';
+            
+            console.log('🎯 Sala gerada:', roomId);
+            console.log('🔗 URL:', shareUrl);
+        }
+
+        // Limpar informações
+        function clearRoom() {
+            document.getElementById('roomInfo').style.display = 'none';
+            // Limpar URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            updateCurrentInfo();
+        }
+
+        // Copiar URL
+        function copyUrl() {
+            const url = document.getElementById('shareUrl').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL copiada para a área de transferência!');
+            });
+        }
+
+        // Abrir em nova aba
+        function openInNewTab() {
+            const url = document.getElementById('shareUrl').textContent;
+            window.open(url, '_blank');
+        }
+
+        // Testar geração de IDs
+        function testIdGeneration() {
+            const ids = [];
+            for (let i = 0; i < 10; i++) {
+                ids.push(generateRoomId());
+            }
+            
+            const resultsDiv = document.getElementById('idResults');
+            resultsDiv.innerHTML = '<h4>IDs Gerados:</h4><ul>' + 
+                ids.map(id => `<li>${id}</li>`).join('') + 
+                '</ul>';
+            
+            // Verificar duplicatas
+            const unique = [...new Set(ids)];
+            if (unique.length !== ids.length) {
+                resultsDiv.innerHTML += '<p style="color: red;">⚠️ Duplicatas encontradas!</p>';
+            } else {
+                resultsDiv.innerHTML += '<p style="color: green;">✅ Todos os IDs são únicos</p>';
+            }
+        }
+
+        // Inicializar
+        updateCurrentInfo();
+        
+        // Atualizar a cada segundo
+        setInterval(updateCurrentInfo, 1000);
+    </script>
+</body>
+</html>

@@ -78,15 +78,18 @@ io.on('connection', (socket) => {
     let roomId: string;
     let user: { id: string; name: string };
     
+    console.log(`[TEST-LOG-BACKEND] 🔥 RECEIVED join-room event from socket ${socket.id}`);
+    console.log(`[TEST-LOG-BACKEND] 📦 Data received:`, JSON.stringify(data));
+    
     // Handle both old format (just roomId string) and new format (object with roomId and user)
     if (typeof data === 'string') {
       roomId = data;
       user = { id: socket.id, name: `User-${socket.id.slice(0, 6)}` };
-      console.log(`User ${user.name} joining room ${roomId}`);
+      console.log(`[TEST-LOG-BACKEND] 📝 Old format - User ${user.name} joining room ${roomId}`);
     } else {
       roomId = data.roomId;
       user = data.user;
-      console.log(`User ${user.name} (${user.id}) joining room ${roomId}`);
+      console.log(`[TEST-LOG-BACKEND] 📝 New format - User ${user.name} (${user.id}) joining room ${roomId}`);
     }
     
     // Leave any previous room
@@ -128,14 +131,18 @@ io.on('connection', (socket) => {
     userSockets.set(user.id, socket.id);
     socketUsers.set(socket.id, { ...user, roomId });
     
+    console.log(`[TEST-LOG-BACKEND] 👥 Current users in room ${roomId} BEFORE adding new user:`, currentUsers);
+    console.log(`[TEST-LOG-BACKEND] 🏠 Room ${roomId} size BEFORE: ${room.size - 1}, AFTER: ${room.size}`);
+    
     // Send current users to the new user
     socket.emit('room-users', currentUsers);
+    console.log(`[TEST-LOG-BACKEND] 📤 Sent room-users event to new user ${user.name} with ${currentUsers.length} existing users`);
     
     // Notify others about the new user
     socket.to(roomId).emit('user-joined', user);
-    console.log(`[TEST-LOG-BACKEND] 🔥 STEP 1-BACKEND: Notified existing users in room ${roomId} about new user: ${user.name} (${user.id})`);
+    console.log(`[TEST-LOG-BACKEND] 🔥 STEP 1-BACKEND: Notified ${room.size - 1} existing users in room ${roomId} about new user: ${user.name} (${user.id})`);
     
-    console.log(`Room ${roomId} now has ${room.size} users`);
+    console.log(`[TEST-LOG-BACKEND] ✅ Room ${roomId} now has ${room.size} users total`);
   });
 
   // Handle leaving a room
