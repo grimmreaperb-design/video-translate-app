@@ -807,16 +807,46 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
           return;
         }
         
-        setUsersInRoom(prev => prev.filter(user => user.id !== userIdLeft));
+        // 🚀 MELHORIA v1.1.0: Limpeza completa quando usuário sai
+        console.log(`[v1.1.0] 🧹 Removendo usuário ${userIdLeft} completamente da sala`);
         
-        // Close and cleanup peer connection
-        const pc = peerConnectionsRef.current.get(userIdLeft);
-        if (pc) {
-          console.log(`[peer] 🧹 Closing connection to ${userIdLeft}`);
-          pc.close();
-          peerConnectionsRef.current.delete(userIdLeft);
-        }
-        setPeerConnections(prev => prev.filter(conn => conn.userId !== userIdLeft));
+        // 1. Remove usuário da lista de usuários na sala
+        setUsersInRoom(prev => {
+          const filtered = prev.filter(user => user.id !== userIdLeft);
+          console.log(`[v1.1.0] 👥 Usuários restantes: ${filtered.length}`);
+          return filtered;
+        });
+        
+        // 2. Fechar e limpar conexão peer
+         const pc = peerConnectionsRef.current.get(userIdLeft);
+         if (pc) {
+           console.log(`[v1.1.0] 🔌 Fechando conexão peer para ${userIdLeft}`);
+           try {
+             // Parar todas as tracks dos receivers remotos
+             pc.getReceivers().forEach(receiver => {
+               if (receiver.track) {
+                 receiver.track.stop();
+                 console.log(`[v1.1.0] ⏹️ Parou track ${receiver.track.kind} de ${userIdLeft}`);
+               }
+             });
+             pc.close();
+           } catch (error) {
+             console.warn(`[v1.1.0] ⚠️ Erro ao fechar conexão para ${userIdLeft}:`, error);
+           }
+           peerConnectionsRef.current.delete(userIdLeft);
+         }
+        
+        // 3. Remover conexão da lista de peer connections (isso remove o vídeo da UI)
+        setPeerConnections(prev => {
+          const filtered = prev.filter(conn => conn.userId !== userIdLeft);
+          console.log(`[v1.1.0] 📹 Conexões de vídeo restantes: ${filtered.length}`);
+          return filtered;
+        });
+        
+        // 4. Limpar qualquer referência de answer processada
+        answersReceivedRef.current.delete(userIdLeft);
+        
+        console.log(`[v1.1.0] ✅ Usuário ${userIdLeft} removido completamente da sala`);
       });
 
       // WebRTC signaling events
