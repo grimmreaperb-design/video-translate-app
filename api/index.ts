@@ -6,8 +6,17 @@ import { Server } from "socket.io";
 const app = express();
 
 // Middleware
+const allowedOrigins = [
+  "https://video-translate-app.vercel.app",
+  "http://localhost:3000"
+];
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json({ limit: "50mb" }));
@@ -148,7 +157,7 @@ app.post("/api/onboarding/users", async (req, res) => {
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
   },
   path: "/socket.io/",
