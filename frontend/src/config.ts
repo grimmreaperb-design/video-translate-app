@@ -3,8 +3,8 @@
 const BACKEND_URLS = {
   // URLs de produção (em ordem de prioridade)
   production: [
-    'https://video-translate-app.vercel.app', // Vercel (temporário - polling apenas)
-    'https://video-translate-backend.onrender.com', // Render (suporta WebSocket)
+    'https://video-translate-app.onrender.com', // Render (suporta WebSocket) - URL CORRETA
+    'https://video-translate-backend.onrender.com', // Render alternativo (se existir)
     'https://video-translate-app-backend.railway.app', // Railway (suporta WebSocket)
   ],
   // URL de desenvolvimento
@@ -13,7 +13,7 @@ const BACKEND_URLS = {
 
 // URLs conhecidas que devem ser evitadas (incorretas)
 const INVALID_URLS = [
-  'https://video-translate-app.onrender.com', // URL incorreta
+  'https://video-translate-app.vercel.app', // Vercel não suporta WebSocket adequadamente
 ];
 
 // Função para obter a URL do socket baseada no ambiente
@@ -36,7 +36,7 @@ export const getSocketUrl = (): string => {
     return BACKEND_URLS.development;
   }
   
-  // Em produção, use a primeira URL disponível
+  // Em produção, use a primeira URL disponível (Render)
   return BACKEND_URLS.production[0];
 };
 
