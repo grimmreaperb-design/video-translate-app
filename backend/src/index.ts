@@ -104,7 +104,7 @@ io.on('connection', (socket) => {
             rooms.delete(currentUser.roomId);
           } else {
             // Notify others in the previous room
-            socket.to(currentUser.roomId).emit('user-left', currentUser.id);
+            socket.to(currentUser.roomId).emit('user-left', { id: currentUser.id, name: currentUser.name });
           }
         }
       }
@@ -138,9 +138,19 @@ io.on('connection', (socket) => {
     socket.emit('room-users', currentUsers);
     console.log(`[TEST-LOG-BACKEND] 📤 Sent room-users event to new user ${user.name} with ${currentUsers.length} existing users`);
     
-    // Notify others about the new user
-    socket.to(roomId).emit('user-joined', user);
-    console.log(`[TEST-LOG-BACKEND] 🔥 STEP 1-BACKEND: Notified ${room.size - 1} existing users in room ${roomId} about new user: ${user.name} (${user.id})`);
+    // Envio do evento 'user-joined' com objeto completo do usuário
+    const currentUsersInRoom = Array.from(room).map(socketId => socketUsers.get(socketId)).filter(Boolean);
+    const joinedUser = currentUsersInRoom.find(u => u!.id === user.id);
+    
+    if (joinedUser) {
+      console.log("Emitindo user-joined para sala", roomId, "com usuário:", joinedUser);
+      socket.to(roomId).emit('user-joined', joinedUser);
+      console.log(`[TEST-LOG-BACKEND] 🔥 STEP 1-BACKEND: Notified ${room.size - 1} users in room ${roomId} about new user: ${joinedUser.name} (${joinedUser.id})`);
+    } else {
+      console.log("Emitindo user-joined para sala", roomId, "com usuário:", user);
+      socket.to(roomId).emit('user-joined', user);
+      console.warn(`[TEST-LOG-BACKEND] ⚠️ WARN: Could not find full user data to emit user-joined for user ${user.name} (${user.id}), sending original user data.`);
+    }
     
     console.log(`[TEST-LOG-BACKEND] ✅ Room ${roomId} now has ${room.size} users total`);
   });
@@ -159,7 +169,7 @@ io.on('connection', (socket) => {
           rooms.delete(user.roomId);
         } else {
           // Notify others in the room
-          socket.to(user.roomId).emit('user-left', user.id);
+          socket.to(user.roomId).emit('user-left', { id: user.id, name: user.name });
         }
       }
       
@@ -232,7 +242,7 @@ io.on('connection', (socket) => {
             rooms.delete(user.roomId);
           } else {
             // Notify others in the room
-            socket.to(user.roomId).emit('user-left', user.id);
+            socket.to(user.roomId).emit('user-left', { id: user.id, name: user.name });
           }
         }
       }

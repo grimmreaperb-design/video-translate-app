@@ -671,33 +671,69 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         }
       });
 
-      socket.on('user-joined', async (user: User) => {
+      socket.on('user-joined', async (userData: any) => {
         if (!isComponentMountedRef.current) return;
         
         try {
           forceLog(`[USER-JOIN] 🔥 STEP 1: User joined event received in room ${roomId}`, 'warn');
-          forceLog(`[USER-JOIN] 👤 New user: ${user?.name || 'Unknown'} (${user?.id || 'No ID'})`, 'warn');
-          forceLog(`[USER-JOIN] 🏠 Current room: ${roomId}`, 'warn');
-          forceLog(`[USER-JOIN] 👤 Current user: ${userName} (${userId})`, 'warn');
+          forceLog(`[USER-JOIN] 📦 Raw data received: ${JSON.stringify(userData)}`, 'warn');
+          forceLog(`[USER-JOIN] 🔍 Data type: ${typeof userData}`, 'warn');
           
-          // Validate user data
-          if (!user || !user.id || !user.name) {
-            forceLog(`[USER-JOIN] ❌ Invalid user data in user-joined event: ${JSON.stringify(user)}`, 'error');
+          // Robust validation for user data
+          let user: User | null = null;
+          
+          // Case 1: userData is already a proper User object
+          if (userData && typeof userData === 'object' && userData.id && userData.name) {
+            user = { id: userData.id, name: userData.name };
+            forceLog(`[USER-JOIN] ✅ Valid user object received: ${user.name} (${user.id})`, 'warn');
+          }
+          // Case 2: userData is just a string (legacy format - user ID only)
+          else if (typeof userData === 'string' && userData.trim()) {
+            user = { id: userData, name: `User-${userData.slice(0, 6)}` };
+            forceLog(`[USER-JOIN] 🔄 Legacy format detected, created user: ${user.name} (${user.id})`, 'warn');
+          }
+          // Case 3: userData is an object but missing required fields
+          else if (userData && typeof userData === 'object') {
+            if (userData.id && !userData.name) {
+              user = { id: userData.id, name: `User-${userData.id.slice(0, 6)}` };
+              forceLog(`[USER-JOIN] 🔧 Missing name, generated: ${user.name} (${user.id})`, 'warn');
+            } else if (userData.name && !userData.id) {
+              // Generate ID from name or timestamp
+              const generatedId = `${userData.name.replace(/\s+/g, '_')}_${Date.now()}`;
+              user = { id: generatedId, name: userData.name };
+              forceLog(`[USER-JOIN] 🔧 Missing ID, generated: ${user.name} (${user.id})`, 'warn');
+            } else {
+              forceLog(`[USER-JOIN] ❌ Object missing both id and name: ${JSON.stringify(userData)}`, 'error');
+            }
+          }
+          // Case 4: Invalid data - log and ignore
+          else {
+            forceLog(`[USER-JOIN] ❌ Invalid user data type or empty: ${JSON.stringify(userData)} (type: ${typeof userData})`, 'error');
             return;
           }
+          
+          // Final validation
+          if (!user || !user.id || !user.name) {
+            forceLog(`[USER-JOIN] ❌ Failed to create valid user object from: ${JSON.stringify(userData)}`, 'error');
+            return;
+          }
+          
+          forceLog(`[USER-JOIN] 👤 Processed user: ${user.name} (${user.id})`, 'warn');
+          forceLog(`[USER-JOIN] 🏠 Current room: ${roomId}`, 'warn');
+          forceLog(`[USER-JOIN] 👤 Current user: ${userName} (${userId})`, 'warn');
           
           // Avoid duplicates
           setUsersInRoom(prev => {
             // Extra safety check to prevent state corruption
             if (!isComponentMountedRef.current) return prev;
             
-            const exists = prev.some(existingUser => existingUser.id === user.id);
+            const exists = prev.some(existingUser => existingUser.id === user!.id);
             if (exists) {
-              forceLog(`[USER-JOIN] ⚠️ User ${user.id} already in room, skipping`, 'warn');
+              forceLog(`[USER-JOIN] ⚠️ User ${user!.id} already in room, skipping`, 'warn');
               return prev;
             }
-            forceLog(`[USER-JOIN] ✅ Adding user ${user.name} to room. Total will be: ${prev.length + 1}`, 'warn');
-            return [...prev, user];
+            forceLog(`[USER-JOIN] ✅ Adding user ${user!.name} to room. Total will be: ${prev.length + 1}`, 'warn');
+            return [...prev, user!];
           });
           
           // 🔥 CORREÇÃO CRÍTICA: Criar oferta WebRTC para o novo usuário
