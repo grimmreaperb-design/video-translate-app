@@ -33,7 +33,7 @@ const io = new socket_io_1.Server(server, {
 const rooms = new Map();
 const userSockets = new Map(); // userId -> socketId
 const socketUsers = new Map(); // socketId -> user
-// Health check endpoint para Render
+// Health check endpoint para Render - Deploy trigger
 app.get('/api/health', (req, res) => {
     res.status(200).json({
         status: 'OK',
