@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import VideoRoom from './components/VideoRoom';
+import HealthCheck from './components/HealthCheck';
+import { logger } from './utils/logger';
 
 function App() {
   const [currentRoom, setCurrentRoom] = useState<string | null>(null);
@@ -10,6 +12,23 @@ function App() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const roomFromUrl = urlParams.get('roomId');
+    
+    logger.log('🚀 App iniciado!');
+    logger.log('🔍 Verificando URL atual:', window.location.href);
+    logger.log('🏠 Room ID extraído:', roomFromUrl);
+    logger.log('🌐 User Agent:', navigator.userAgent);
+    logger.log('📱 Plataforma detectada:', navigator.platform);
+    logger.log('🔗 Protocolo:', window.location.protocol);
+    logger.log('🌍 Host:', window.location.host);
+    
+    // Verificar se está no Vercel
+    const isVercel = window.location.hostname.includes('vercel.app');
+    logger.log('☁️ Executando no Vercel:', isVercel);
+    
+    if (isVercel) {
+      logger.log('⚠️ ATENÇÃO: Vercel detectado - WebSocket pode ter limitações');
+      logger.log('🔄 Fallback para polling será usado automaticamente');
+    }
     
     if (roomFromUrl && roomFromUrl.trim()) {
       setCurrentRoom(roomFromUrl.trim());
@@ -83,6 +102,9 @@ function App() {
             onLeaveRoom={handleLeaveRoom}
           />
         )}
+        
+        {/* Health Check - Visível apenas em desenvolvimento */}
+        <HealthCheck />
       </main>
     </div>
   );

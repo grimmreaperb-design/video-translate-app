@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Connection Test - CORS Fix</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { margin: 5px 0; padding: 5px; border-left: 3px solid #ccc; }
+        .success { border-color: green; background: #f0fff0; }
+        .error { border-color: red; background: #fff0f0; }
+        .info { border-color: blue; background: #f0f0ff; }
+        .warning { border-color: orange; background: #fff8f0; }
+        button { margin: 5px; padding: 10px; }
+        .status { font-weight: bold; padding: 10px; margin: 10px 0; }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+        .connecting { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>🔌 Socket.IO Connection Test - CORS Fix</h1>
+    
+    <div id="status" class="status disconnected">Status: Desconectado</div>
+    
+    <div>
+        <label>Backend URL: 
+            <input type="text" id="backendUrl" value="https://video-translate-backend-wv9b.onrender.com" style="width: 400px;">
+        </label>
+        <br><br>
+        <button onclick="testConnection()">🔗 Test Connection</button>
+        <button onclick="testJoinRoom()">🚪 Test Join Room</button>
+        <button onclick="testFullFlow()">🚀 Test Full Flow</button>
+        <button onclick="clearLogs()">🧹 Clear Logs</button>
+    </div>
+    
+    <div id="logs"></div>
+
+    <script>
+        let socket = null;
+        let connectionStatus = 'disconnected';
+        
+        function updateStatus(status, message) {
+            connectionStatus = status;
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${status}`;
+            statusDiv.textContent = `Status: ${message}`;
+        }
+        
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logs.appendChild(logDiv);
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        function testConnection() {
+            const backendUrl = document.getElementById('backendUrl').value;
+            log(`🔗 Tentando conectar ao: ${backendUrl}`, 'info');
+            updateStatus('connecting', 'Conectando...');
+            
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            socket = io(backendUrl, {
+                transports: ['websocket', 'polling'],
+                timeout: 10000,
+                forceNew: true
+            });
+            
+            socket.on('connect', () => {
+                log(`✅ Conectado com sucesso! Socket ID: ${socket.id}`, 'success');
+                updateStatus('connected', `Conectado (${socket.id})`);
+            });
+            
+            socket.on('connect_error', (error) => {
+                log(`❌ Erro de conexão: ${error.message}`, 'error');
+                updateStatus('disconnected', `Erro: ${error.message}`);
+            });
+            
+            socket.on('disconnect', (reason) => {
+                log(`🔌 Desconectado: ${reason}`, 'warning');
+                updateStatus('disconnected', `Desconectado: ${reason}`);
+            });
+            
+            socket.on('error', (error) => {
+                log(`❌ Erro: ${error}`, 'error');
+            });
+        }
+        
+        function testJoinRoom() {
+            if (!socket || !socket.connected) {
+                log('❌ Socket não está conectado. Conecte primeiro!', 'error');
+                return;
+            }
+            
+            const testUser = {
+                id: `test_user_${Date.now()}`,
+                name: 'Test User',
+                language: 'en'
+            };
+            
+            const testRoomId = 'test-room-123';
+            
+            log(`🚪 Tentando entrar na sala: ${testRoomId}`, 'info');
+            log(`👤 Usuário: ${JSON.stringify(testUser)}`, 'info');
+            
+            // Listen for room events
+            socket.on('room-users', (users) => {
+                log(`👥 Usuários na sala recebidos: ${JSON.stringify(users)}`, 'success');
+            });
+            
+            socket.on('user-joined', (user) => {
+                log(`➕ Usuário entrou na sala: ${JSON.stringify(user)}`, 'success');
+            });
+            
+            socket.on('user-left', (userId) => {
+                log(`➖ Usuário saiu da sala: ${userId}`, 'info');
+            });
+            
+            // Join room
+            socket.emit('join-room', {
+                roomId: testRoomId,
+                user: testUser
+            });
+            
+            log(`📤 Evento join-room enviado`, 'info');
+        }
+        
+        function testFullFlow() {
+            log(`🚀 Iniciando teste completo do fluxo...`, 'info');
+            
+            // Step 1: Connect
+            testConnection();
+            
+            // Step 2: Wait for connection and join room
+            setTimeout(() => {
+                if (connectionStatus === 'connected') {
+                    log(`✅ Conexão estabelecida, testando entrada na sala...`, 'success');
+                    testJoinRoom();
+                } else {
+                    log(`❌ Falha na conexão, não é possível testar entrada na sala`, 'error');
+                }
+            }, 2000);
+        }
+        
+        // Auto-start test when page loads
+        window.onload = function() {
+            log(`🔄 Página carregada, iniciando teste automático...`, 'info');
+            setTimeout(testFullFlow, 1000);
+        };
+    </script>
+</body>
+</html>
