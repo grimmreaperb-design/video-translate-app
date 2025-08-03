@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Simples - Room ID</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .error-box {
+            background: #ffebee;
+            border: 1px solid #f44336;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .success-box {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        #logs {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Simples - Room ID</h1>
+        
+        <div class="info-box">
+            <h3>Informações da URL:</h3>
+            <p><strong>URL Completa:</strong> <span id="fullUrl"></span></p>
+            <p><strong>Room ID da URL:</strong> <span id="urlRoomId"></span></p>
+        </div>
+
+        <div class="info-box">
+            <h3>Teste de Conexão Socket.IO:</h3>
+            <button onclick="testSocketConnection()">Testar Conexão</button>
+            <div id="socketStatus">Não testado</div>
+        </div>
+
+        <div class="info-box">
+            <h3>Logs:</h3>
+            <div id="logs"></div>
+            <button onclick="clearLogs()">Limpar Logs</button>
+        </div>
+    </div>
+
+    <script>
+        // Função para adicionar logs
+        function addLog(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logs.appendChild(logEntry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        // Mostrar informações da URL
+        function displayUrlInfo() {
+            const fullUrl = window.location.href;
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('roomId');
+
+            document.getElementById('fullUrl').textContent = fullUrl;
+            document.getElementById('urlRoomId').textContent = roomId || 'Não encontrado';
+
+            addLog(`URL: ${fullUrl}`);
+            addLog(`Room ID: ${roomId || 'Não encontrado'}`);
+        }
+
+        // Testar conexão Socket.IO
+        function testSocketConnection() {
+            const statusDiv = document.getElementById('socketStatus');
+            statusDiv.innerHTML = '<span style="color: orange;">Testando...</span>';
+            addLog('Iniciando teste de conexão Socket.IO...');
+
+            try {
+                // Tentar conectar ao backend
+                const SOCKET_URL = 'https://video-translate-app.onrender.com';
+                addLog(`Tentando conectar a: ${SOCKET_URL}`);
+                
+                // Simular teste de conectividade
+                fetch(`${SOCKET_URL}/api/health`)
+                    .then(response => {
+                        if (response.ok) {
+                            statusDiv.innerHTML = '<span style="color: green;">✅ Backend acessível</span>';
+                            addLog('✅ Backend está respondendo');
+                            return response.text();
+                        } else {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                    })
+                    .then(data => {
+                        addLog(`Resposta do backend: ${data}`);
+                    })
+                    .catch(error => {
+                        statusDiv.innerHTML = '<span style="color: red;">❌ Erro de conexão</span>';
+                        addLog(`❌ Erro: ${error.message}`, 'error');
+                    });
+            } catch (error) {
+                statusDiv.innerHTML = '<span style="color: red;">❌ Erro</span>';
+                addLog(`❌ Erro: ${error.message}`, 'error');
+            }
+        }
+
+        // Inicializar quando a página carregar
+        window.onload = function() {
+            addLog('Página carregada');
+            displayUrlInfo();
+        };
+    </script>
+</body>
+</html>
