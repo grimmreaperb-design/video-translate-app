@@ -13,4 +13,4 @@ services:
         value: 10000
       - key: FRONTEND_URL
         value: https://video-translate-app.vercel.app
-    healthCheckPath: /api/health
+    healthCheckPath: /health
