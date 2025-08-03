@@ -46,7 +46,7 @@ const rooms = new Map<string, Set<string>>();
 const userSockets = new Map<string, string>(); // userId -> socketId
 const socketUsers = new Map<string, { id: string; name: string; roomId?: string }>(); // socketId -> user
 
-// Health check endpoint para Render
+// Health check endpoint para Render - Deploy trigger
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK',
