@@ -675,10 +675,12 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         if (!isComponentMountedRef.current) return;
         
         try {
-          // 🧪 Verificação defensiva conforme sugerido
+          // 🧪 Teste defensivo conforme sugerido pelo usuário
           if (typeof newUser === "string") {
-            console.warn("❌ user-joined veio como string:", newUser);
+            console.error("❌ Erro: user-joined veio como string:", newUser);
             return;
+          } else {
+            console.log("✅ user-joined OK:", newUser);
           }
           
           console.log('[USER-JOIN] Novo usuário recebido:', newUser);
