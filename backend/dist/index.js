@@ -13,6 +13,7 @@ const server = (0, http_1.createServer)(app);
 const corsOptions = {
     origin: [
         'http://localhost:3000',
+        'http://localhost:3001',
         'https://video-translate-app.vercel.app',
         'https://video-translate-app-git-main-brunomagalhaes-projects.vercel.app',
         'https://video-translate-app-brunomagalhaes-projects.vercel.app'
@@ -25,7 +26,9 @@ app.use((0, cors_1.default)(corsOptions));
 app.use(express_1.default.json());
 // Socket.IO configuration
 const io = new socket_io_1.Server(server, {
-    cors: corsOptions
+    cors: corsOptions,
+    allowEIO3: true,
+    transports: ['websocket', 'polling']
 });
 // In-memory storage for rooms and users
 const rooms = new Map();
@@ -40,38 +43,42 @@ io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
     // Handle joining a room
     socket.on('join-room', (data) => {
-        const { roomId, user } = data;
-        console.log(`🔵 User ${user.name} (${user.id}) joining room ${roomId} with socket ${socket.id}`);
-        console.log(`🔍 Current rooms:`, Array.from(rooms.keys()));
-        console.log(`🔍 Current users in target room:`, rooms.has(roomId) ? Array.from(rooms.get(roomId)) : 'Room does not exist yet');
+        let roomId;
+        let user;
+        // Handle both old format (just roomId string) and new format (object with roomId and user)
+        if (typeof data === 'string') {
+            roomId = data;
+            user = { id: socket.id, name: `User-${socket.id.slice(0, 6)}` };
+            console.log(`User ${user.name} joining room ${roomId}`);
+        }
+        else {
+            roomId = data.roomId;
+            user = data.user;
+            console.log(`User ${user.name} (${user.id}) joining room ${roomId}`);
+        }
         // Leave any previous room
         if (socketUsers.has(socket.id)) {
             const currentUser = socketUsers.get(socket.id);
             if (currentUser.roomId) {
-                console.log(`🔄 User was in room ${currentUser.roomId}, leaving it first`);
                 socket.leave(currentUser.roomId);
                 const currentRoom = rooms.get(currentUser.roomId);
                 if (currentRoom) {
                     currentRoom.delete(socket.id);
                     if (currentRoom.size === 0) {
                         rooms.delete(currentUser.roomId);
-                        console.log(`🗑️ Room ${currentUser.roomId} deleted (empty)`);
                     }
                     else {
                         // Notify others in the previous room
                         socket.to(currentUser.roomId).emit('user-left', currentUser.id);
-                        console.log(`📢 Notified users in ${currentUser.roomId} that ${currentUser.id} left`);
                     }
                 }
             }
         }
         // Join the new room
         socket.join(roomId);
-        console.log(`✅ Socket ${socket.id} joined room ${roomId}`);
         // Initialize room if it doesn't exist
         if (!rooms.has(roomId)) {
             rooms.set(roomId, new Set());
-            console.log(`🆕 Created new room ${roomId}`);
         }
         const room = rooms.get(roomId);
         // Get current users in the room
@@ -79,21 +86,15 @@ io.on('connection', (socket) => {
             const userData = socketUsers.get(socketId);
             return userData ? { id: userData.id, name: userData.name } : null;
         }).filter(Boolean);
-        console.log(`👥 Current users in room before adding new user:`, currentUsers);
         // Add user to room and update mappings
         room.add(socket.id);
         userSockets.set(user.id, socket.id);
         socketUsers.set(socket.id, { ...user, roomId });
-        console.log(`📝 Updated mappings - userSockets:`, Object.fromEntries(userSockets));
-        console.log(`📝 Updated mappings - socketUsers:`, Object.fromEntries(socketUsers));
         // Send current users to the new user
         socket.emit('room-users', currentUsers);
-        console.log(`📤 Sent current users to new user:`, currentUsers);
         // Notify others about the new user
         socket.to(roomId).emit('user-joined', user);
-        console.log(`📢 Notified other users in room ${roomId} about new user ${user.name}`);
-        console.log(`🎯 Room ${roomId} now has ${room.size} users: ${Array.from(room)}`);
-        console.log(`📊 Total rooms: ${rooms.size}, Total users: ${socketUsers.size}`);
+        console.log(`Room ${roomId} now has ${room.size} users`);
     });
     // Handle leaving a room
     socket.on('leave-room', () => {
@@ -118,44 +119,44 @@ io.on('connection', (socket) => {
         }
     });
     // WebRTC signaling - offer
-    socket.on('offer', (data) => {
+    socket.on('webrtc-offer', (data) => {
         const user = socketUsers.get(socket.id);
         if (user) {
             const targetSocketId = userSockets.get(data.to);
             if (targetSocketId) {
-                io.to(targetSocketId).emit('offer', {
+                io.to(targetSocketId).emit('webrtc-offer', {
                     offer: data.offer,
                     from: user.id
                 });
-                console.log(`Offer sent from ${user.id} to ${data.to}`);
+                console.log(`WebRTC Offer sent from ${user.id} to ${data.to}`);
             }
         }
     });
     // WebRTC signaling - answer
-    socket.on('answer', (data) => {
+    socket.on('webrtc-answer', (data) => {
         const user = socketUsers.get(socket.id);
         if (user) {
             const targetSocketId = userSockets.get(data.to);
             if (targetSocketId) {
-                io.to(targetSocketId).emit('answer', {
+                io.to(targetSocketId).emit('webrtc-answer', {
                     answer: data.answer,
                     from: user.id
                 });
-                console.log(`Answer sent from ${user.id} to ${data.to}`);
+                console.log(`WebRTC Answer sent from ${user.id} to ${data.to}`);
             }
         }
     });
     // WebRTC signaling - ICE candidate
-    socket.on('ice-candidate', (data) => {
+    socket.on('webrtc-ice-candidate', (data) => {
         const user = socketUsers.get(socket.id);
         if (user) {
             const targetSocketId = userSockets.get(data.to);
             if (targetSocketId) {
-                io.to(targetSocketId).emit('ice-candidate', {
+                io.to(targetSocketId).emit('webrtc-ice-candidate', {
                     candidate: data.candidate,
                     from: user.id
                 });
-                console.log(`ICE candidate sent from ${user.id} to ${data.to}`);
+                console.log(`WebRTC ICE candidate sent from ${user.id} to ${data.to}`);
             }
         }
     });

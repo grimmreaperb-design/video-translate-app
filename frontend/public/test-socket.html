@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Socket.IO Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Socket.IO Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="logs"></div>
+
+    <script>
+        const logs = document.getElementById('logs');
+        const status = document.getElementById('status');
+        
+        function log(message) {
+            console.log(message);
+            logs.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+        }
+        
+        log('🔌 Attempting to connect to http://localhost:3001');
+        
+        const socket = io('http://localhost:3001', {
+            transports: ['websocket', 'polling'],
+            timeout: 20000,
+            forceNew: true
+        });
+        
+        socket.on('connect', () => {
+            log('✅ Connected! Socket ID: ' + socket.id);
+            status.textContent = 'Connected';
+            status.style.color = 'green';
+            
+            // Test joining a room
+            socket.emit('join-room', 'test-room-123');
+            log('🏠 Emitted join-room event');
+        });
+        
+        socket.on('disconnect', (reason) => {
+            log('❌ Disconnected: ' + reason);
+            status.textContent = 'Disconnected';
+            status.style.color = 'red';
+        });
+        
+        socket.on('connect_error', (error) => {
+            log('🚨 Connection error: ' + error.message);
+            status.textContent = 'Error';
+            status.style.color = 'red';
+        });
+        
+        socket.on('room-users', (users) => {
+            log('👥 Room users: ' + JSON.stringify(users));
+        });
+        
+        socket.on('user-joined', (userId) => {
+            log('👋 User joined: ' + userId);
+        });
+    </script>
+</body>
+</html>

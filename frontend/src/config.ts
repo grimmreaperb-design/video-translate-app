@@ -8,7 +8,7 @@ const BACKEND_URLS = {
     'https://video-translate-app-backend.railway.app', // Railway (suporta WebSocket)
   ],
   // URL de desenvolvimento
-  development: 'http://localhost:3002'
+  development: 'http://localhost:3001'
 };
 
 // URLs conhecidas que devem ser evitadas (incorretas)

@@ -420,9 +420,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       const socketUrl = currentSocketUrl;
       const transports = getSocketTransports(socketUrl);
       
-      console.log('🔌 Initializing socket connection...');
-      console.log('🔧 DEBUG: process.env.REACT_APP_SOCKET_URL:', process.env.REACT_APP_SOCKET_URL);
-      console.log('🔧 DEBUG: process.env.NODE_ENV:', process.env.NODE_ENV);
+      console.log('Initializing socket connection...');
       setConnectionStatus('connecting');
       
       // Disconnect existing socket if any
@@ -445,9 +443,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       socket.on('connect', () => {
         if (!isComponentMountedRef.current) return;
         
-        console.log(`✅ Socket conectado com sucesso: ${socketUrl}`);
-        console.log(`🔗 Transport usado: ${socket.io.engine.transport.name}`);
-        console.log('[socket-event] ✅ Socket connected:', socket.id);
+        console.log('Socket connected successfully');
         setConnectionStatus('connected');
         setError('');
         resetReconnectionState();
@@ -460,7 +456,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         // Small delay to ensure socket is fully ready
         setTimeout(() => {
           if (isComponentMountedRef.current && socketRef.current?.connected) {
-            console.log(`[socket-event] 🚪 Joining room ${roomId} as ${userName} (${userId})`);
+            console.log('Joining room:', roomId);
             // Join room with correct format
             socket.emit('join-room', { 
               roomId, 
@@ -476,7 +472,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       socket.on('disconnect', (reason) => {
         if (!isComponentMountedRef.current) return;
         
-        console.log(`🔌 Socket desconectado: ${reason}`);
+        console.log(`Socket disconnected: ${reason}`);
         setConnectionStatus('disconnected');
         
         // Store the disconnect reason for debugging
@@ -492,9 +488,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         if (!isComponentMountedRef.current) return;
         
         const errorMsg = error.message || error.toString();
-        console.error(`❌ Erro de conexão do socket: ${errorMsg}`);
-        console.error(`🔗 URL tentada: ${socketUrl}`);
-        console.error(`🚀 Transportes tentados: ${transports.join(', ')}`);
+        console.error('Socket connection error:', errorMsg);
         
         setConnectionStatus('disconnected');
         setError(`Erro de conexão: ${errorMsg}`);
@@ -578,7 +572,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       });
 
     } catch (error) {
-      console.error('❌ Erro ao inicializar socket:', error);
+      console.error('Error initializing socket:', error);
       setConnectionStatus('disconnected');
       setError('Erro ao inicializar conexão');
       reconnectionRef.current.lastError = error instanceof Error ? error.message : String(error);
