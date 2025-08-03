@@ -84,13 +84,24 @@
 
 ### 🔍 Health Checks
 - **Frontend**: Monitorado automaticamente pelo Vercel
-- **Backend**: `/health` endpoint disponível
+- **Backend**: `/health` e `/api/health` endpoints disponíveis
 - **Uptime**: Monitorado pelo Render
+- **Keep-Alive**: GitHub Actions ping automático a cada 5 minutos
 
 ### 📈 Performance
 - **Frontend**: CDN global do Vercel
-- **Backend**: Servidor otimizado no Render
+- **Backend**: Servidor otimizado no Render (sempre ativo via keep-alive)
 - **Database**: Supabase (PostgreSQL gerenciado)
+
+### 🛡️ Solução de Cold Start
+**Problema Identificado**: Render coloca serviços em "sleep" após inatividade, causando falhas na conexão WebRTC.
+
+**Solução Implementada**: 
+- ✅ GitHub Actions workflow executando a cada 5 minutos
+- ✅ Ping automático para `https://video-translate-app.onrender.com/api/health`
+- ✅ Mantém backend sempre ativo e responsivo
+- ✅ Elimina timeouts de conexão Socket.IO
+- ✅ Garante funcionamento contínuo da videoconferência
 
 ---
 
@@ -116,6 +127,13 @@
 3. ✅ Configuração de variáveis de ambiente
 4. ✅ Teste de conectividade
 5. ✅ Verificação de funcionalidades
+
+### ✅ Otimizações Implementadas
+- ✅ **Keep-Alive Automático**: GitHub Actions ping a cada 5 minutos
+  - Previne cold starts do Render
+  - Mantém backend sempre ativo
+  - Garante conectividade WebRTC constante
+  - Workflow: `.github/workflows/keep-render-awake.yml`
 
 ### 🔧 Otimizações Futuras
 - [ ] Implementar cache Redis (se necessário)
