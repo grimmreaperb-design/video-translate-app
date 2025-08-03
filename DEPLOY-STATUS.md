@@ -33,6 +33,7 @@
 - **Build Tool**: Create React App
 - **Hospedagem**: Vercel (CDN Global)
 - **Variáveis de Ambiente**: Configuradas para produção
+- **CSP**: Content Security Policy configurada para permitir Socket.IO/PeerJS
 - **HTTPS**: Automático via Vercel
 
 ### Backend
@@ -68,7 +69,7 @@
 - ✅ Tradução de texto (LibreTranslate)
 - ✅ Síntese de voz (Web Speech API TTS)
 - ✅ Comunicação em tempo real (Socket.IO)
-- ✅ Compartilhamento P2P (PeerJS)
+- ✅ Compartilhamento P2P (PeerJS) ✅ (CSP corrigida)
 - ✅ Armazenamento de dados (Supabase)
 
 ### 🔄 Recursos em Tempo Real
