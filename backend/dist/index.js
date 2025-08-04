@@ -7,6 +7,8 @@ const express_1 = __importDefault(require("express"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
 const cors_1 = __importDefault(require("cors"));
+const multer_1 = __importDefault(require("multer"));
+const transcription_1 = require("./transcription");
 const app = (0, express_1.default)();
 const server = (0, http_1.createServer)(app);
 // CORS configuration - liberado para produção
@@ -18,6 +20,11 @@ const corsOptions = {
 };
 app.use((0, cors_1.default)(corsOptions));
 app.use(express_1.default.json());
+// Configurar multer para upload de arquivos de áudio
+const upload = (0, multer_1.default)({
+    storage: multer_1.default.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
 // Socket.IO configuration - otimizado para produção
 const io = new socket_io_1.Server(server, {
     cors: {
@@ -50,9 +57,30 @@ app.get('/', (req, res) => {
         status: 'OK',
         endpoints: {
             health: '/api/health',
+            transcription: '/api/transcription/health',
             socket: '/socket.io/'
         }
     });
+});
+// Endpoint para verificar saúde do sistema de transcrição
+app.get('/api/transcription/health', async (req, res) => {
+    try {
+        const health = await (0, transcription_1.checkTranscriptionSystemHealth)();
+        res.status(200).json({
+            status: health.overall ? 'OK' : 'PARTIAL',
+            message: 'Transcription system health check',
+            components: health,
+            timestamp: new Date().toISOString()
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            status: 'ERROR',
+            message: 'Failed to check transcription system health',
+            error: String(error),
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 // Socket.IO connection handling
 io.on('connection', (socket) => {
@@ -195,6 +223,60 @@ io.on('connection', (socket) => {
                 });
                 console.log(`[TEST-LOG-BACKEND] ✅ ICE candidate forwarded to ${data.to}`);
             }
+        }
+    });
+    // Handle audio chunk for transcription
+    socket.on('audio-chunk', async (data) => {
+        try {
+            console.log(`🎵 [TRANSCRIPTION] Received audio chunk from user ${data.userId} in room ${data.roomId}`);
+            // Verificar se o usuário está na sala
+            const user = socketUsers.get(socket.id);
+            if (!user || user.roomId !== data.roomId) {
+                console.warn(`⚠️ [TRANSCRIPTION] User ${data.userId} not in room ${data.roomId} or invalid session`);
+                socket.emit('transcription-error', {
+                    error: 'User not in room or invalid session',
+                    timestamp: new Date().toISOString()
+                });
+                return;
+            }
+            // Converter ArrayBuffer para Buffer
+            const audioBuffer = Buffer.from(data.audioBlob);
+            // Preparar dados para processamento
+            const audioChunkData = {
+                userId: data.userId,
+                roomId: data.roomId,
+                timestamp: data.timestamp,
+                audioBlob: audioBuffer
+            };
+            // Processar chunk de áudio (transcrição)
+            const result = await (0, transcription_1.processAudioChunk)(audioChunkData);
+            if (result.success && result.transcript) {
+                // Enviar transcrição para todos na sala
+                io.to(data.roomId).emit('transcription-result', {
+                    userId: data.userId,
+                    roomId: data.roomId,
+                    transcript: result.transcript,
+                    timestamp: data.timestamp,
+                    processingTime: result.processingTime
+                });
+                console.log(`✅ [TRANSCRIPTION] Successfully processed and broadcasted transcript for user ${data.userId}`);
+            }
+            else {
+                // Enviar erro apenas para o usuário que enviou o áudio
+                socket.emit('transcription-error', {
+                    error: result.error || 'Unknown transcription error',
+                    timestamp: new Date().toISOString(),
+                    processingTime: result.processingTime
+                });
+                console.error(`❌ [TRANSCRIPTION] Failed to process audio for user ${data.userId}: ${result.error}`);
+            }
+        }
+        catch (error) {
+            console.error('❌ [TRANSCRIPTION] Exception handling audio chunk:', error);
+            socket.emit('transcription-error', {
+                error: 'Internal server error during transcription',
+                timestamp: new Date().toISOString()
+            });
         }
     });
     // Handle disconnection

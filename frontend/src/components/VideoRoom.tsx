@@ -54,6 +54,17 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'reconnecting'>('connecting');
   const [currentSocketUrl, setCurrentSocketUrl] = useState<string>(SOCKET_URL);
   const [fallbackIndex, setFallbackIndex] = useState<number>(-1);
+  
+  // Transcription states
+  const [isTranscriptionEnabled, setIsTranscriptionEnabled] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcriptions, setTranscriptions] = useState<Array<{
+    userId: string;
+    userName: string;
+    transcript: string;
+    timestamp: string;
+  }>>([]);
+  const [transcriptionError, setTranscriptionError] = useState<string>('');
 
   // Generate unique user ID
   const userId = useMemo(() => `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, []);
@@ -65,6 +76,11 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const isComponentMountedRef = useRef<boolean>(true);
   const answersReceivedRef = useRef<Set<string>>(new Set()); // 🚨 NOVO: Rastrear answers processadas
+  
+  // Transcription refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const transcriptionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectionRef = useRef<ReconnectionState>({
     attempts: 0,
     maxAttempts: 8,
@@ -105,6 +121,130 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     reconnectionRef.current.attempts = 0;
     reconnectionRef.current.isReconnecting = false;
   }, [clearReconnectionTimeout]);
+
+  // Transcription functions
+  const startAudioCapture = useCallback(async () => {
+    try {
+      if (!localStreamRef.current) {
+        logger.error('❌ [TRANSCRIPTION] No local stream available for audio capture');
+        setTranscriptionError('No audio stream available');
+        return;
+      }
+
+      // Get audio track from local stream
+      const audioTracks = localStreamRef.current.getAudioTracks();
+      if (audioTracks.length === 0) {
+        logger.error('❌ [TRANSCRIPTION] No audio tracks found in local stream');
+        setTranscriptionError('No audio tracks available');
+        return;
+      }
+
+      // Create audio-only stream for recording
+      const audioStream = new MediaStream(audioTracks);
+      
+      // Create MediaRecorder
+      const mediaRecorder = new MediaRecorder(audioStream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      // Handle data available
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+          logger.log(`🎵 [TRANSCRIPTION] Audio chunk captured: ${event.data.size} bytes`);
+        }
+      };
+
+      // Handle recording stop
+      mediaRecorder.onstop = async () => {
+        if (audioChunksRef.current.length > 0 && socketRef.current && isComponentMountedRef.current) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          
+          // Convert blob to ArrayBuffer
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          
+          // Send to backend
+          const timestamp = new Date().toISOString();
+          logger.log(`📤 [TRANSCRIPTION] Sending audio chunk: ${arrayBuffer.byteLength} bytes`);
+          
+          socketRef.current.emit('audio-chunk', {
+            audioBlob: arrayBuffer,
+            userId: userId,
+            roomId: roomId,
+            timestamp: timestamp
+          });
+          
+          setIsTranscribing(true);
+        }
+        
+        // Clear chunks for next recording
+        audioChunksRef.current = [];
+      };
+
+      // Start recording
+      mediaRecorder.start();
+      logger.log('🎤 [TRANSCRIPTION] Started audio recording');
+
+      // Set up interval to record in 5-second chunks
+      transcriptionIntervalRef.current = setInterval(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          mediaRecorderRef.current.stop();
+          
+          // Start new recording immediately
+          setTimeout(() => {
+            if (mediaRecorderRef.current && isTranscriptionEnabled && isComponentMountedRef.current) {
+              mediaRecorderRef.current.start();
+            }
+          }, 100);
+        }
+      }, 5000); // 5 seconds
+
+      setTranscriptionError('');
+      logger.log('✅ [TRANSCRIPTION] Audio capture started successfully');
+      
+    } catch (error) {
+      logger.error('❌ [TRANSCRIPTION] Error starting audio capture:', error);
+      setTranscriptionError(`Failed to start audio capture: ${error}`);
+    }
+  }, [userId, roomId, isTranscriptionEnabled]);
+
+  const stopAudioCapture = useCallback(() => {
+    try {
+      // Stop interval
+      if (transcriptionIntervalRef.current) {
+        clearInterval(transcriptionIntervalRef.current);
+        transcriptionIntervalRef.current = null;
+      }
+
+      // Stop MediaRecorder
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+
+      mediaRecorderRef.current = null;
+      audioChunksRef.current = [];
+      setIsTranscribing(false);
+      
+      logger.log('🛑 [TRANSCRIPTION] Audio capture stopped');
+    } catch (error) {
+      logger.error('❌ [TRANSCRIPTION] Error stopping audio capture:', error);
+    }
+  }, []);
+
+  const toggleTranscription = useCallback(async () => {
+    if (isTranscriptionEnabled) {
+      stopAudioCapture();
+      setIsTranscriptionEnabled(false);
+      logger.log('🔇 [TRANSCRIPTION] Transcription disabled');
+    } else {
+      setIsTranscriptionEnabled(true);
+      await startAudioCapture();
+      logger.log('🎤 [TRANSCRIPTION] Transcription enabled');
+    }
+  }, [isTranscriptionEnabled, startAudioCapture, stopAudioCapture]);
 
   // Initialize local media
   const initializeLocalMedia = useCallback(async () => {
@@ -911,6 +1051,55 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       socket.on('webrtc-answer', handleAnswer);
       socket.on('webrtc-ice-candidate', handleIceCandidate);
 
+      // Transcription events
+      socket.on('transcription-result', (data: {
+        userId: string;
+        roomId: string;
+        transcript: string;
+        timestamp: string;
+        processingTime: number;
+      }) => {
+        if (!isComponentMountedRef.current) return;
+        
+        logger.log(`📝 [TRANSCRIPTION] Received transcript from ${data.userId}: "${data.transcript}"`);
+        
+        // Find user name
+        const user = usersInRoom.find(u => u.id === data.userId);
+        const userName = user ? user.name : `User ${data.userId.slice(0, 8)}`;
+        
+        // Add to transcriptions
+        setTranscriptions(prev => [...prev, {
+          userId: data.userId,
+          userName: userName,
+          transcript: data.transcript,
+          timestamp: data.timestamp
+        }]);
+        
+        // Clear transcribing state if it's from current user
+        if (data.userId === userId) {
+          setIsTranscribing(false);
+        }
+      });
+
+      socket.on('transcription-error', (data: {
+        error: string;
+        timestamp: string;
+        processingTime?: number;
+      }) => {
+        if (!isComponentMountedRef.current) return;
+        
+        logger.error(`❌ [TRANSCRIPTION] Error: ${data.error}`);
+        setTranscriptionError(data.error);
+        setIsTranscribing(false);
+        
+        // Clear error after 5 seconds
+        setTimeout(() => {
+          if (isComponentMountedRef.current) {
+            setTranscriptionError('');
+          }
+        }, 5000);
+      });
+
       socket.on('error', (error: string) => {
         if (!isComponentMountedRef.current) return;
         
@@ -1000,6 +1189,21 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         console.warn('Error during peer connections cleanup:', error);
       }
       
+      // Stop transcription if active
+      try {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+        if (transcriptionIntervalRef.current) {
+          clearInterval(transcriptionIntervalRef.current);
+          transcriptionIntervalRef.current = null;
+        }
+        mediaRecorderRef.current = null;
+        audioChunksRef.current = [];
+      } catch (error) {
+        console.warn('Error during transcription cleanup:', error);
+      }
+      
       // Clear state safely
       try {
         setPeerConnections([]);
@@ -1014,6 +1218,11 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   }, [roomId, userName, initializeLocalMedia, initializeSocket, clearReconnectionTimeout]);
 
   const handleLeaveRoom = () => {
+    // Stop transcription if active
+    if (isTranscriptionEnabled) {
+      stopAudioCapture();
+    }
+    
     if (socketRef.current) {
       socketRef.current.emit('leave-room', { roomId });
       socketRef.current.disconnect();
@@ -1190,6 +1399,68 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
             <p>Clique no link acima para copiá-lo e compartilhar com outras pessoas!</p>
           </div>
         )}
+      </div>
+
+      {/* Transcription Section */}
+      <div className="transcription-section">
+        <div className="transcription-header">
+          <h3>📝 Transcrição de Áudio</h3>
+          <div className="transcription-controls">
+            <button 
+              onClick={toggleTranscription}
+              className={`transcription-btn ${isTranscriptionEnabled ? 'active' : ''}`}
+              disabled={isTranscribing}
+            >
+              {isTranscribing ? (
+                <>🔄 Transcrevendo...</>
+              ) : isTranscriptionEnabled ? (
+                <>🛑 Parar Transcrição</>
+              ) : (
+                <>🎤 Iniciar Transcrição</>
+              )}
+            </button>
+            {isTranscriptionEnabled && (
+              <span className="transcription-status">
+                {isTranscribing ? '🔴 Gravando...' : '⏸️ Aguardando áudio'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {transcriptionError && (
+          <div className="transcription-error">
+            ❌ Erro na transcrição: {transcriptionError}
+          </div>
+        )}
+
+        <div className="transcriptions-container">
+          {transcriptions.length === 0 ? (
+            <div className="no-transcriptions">
+              {isTranscriptionEnabled ? 
+                '🎤 Fale algo para ver a transcrição aparecer aqui...' : 
+                '📝 Ative a transcrição para ver as conversas transcritas'
+              }
+            </div>
+          ) : (
+            <div className="transcriptions-list">
+              {transcriptions.map((transcription, index) => (
+                <div key={index} className="transcription-item">
+                  <div className="transcription-meta">
+                    <span className="transcription-user">
+                      {transcription.userId === userId ? 'Você' : transcription.userName}
+                    </span>
+                    <span className="transcription-time">
+                      {new Date(transcription.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <div className="transcription-text">
+                    {transcription.transcript}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

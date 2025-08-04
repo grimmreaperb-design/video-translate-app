@@ -52,6 +52,16 @@ CREATE TABLE IF NOT EXISTS translation_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Transcriptions table for Whisper.cpp audio transcription
+CREATE TABLE IF NOT EXISTS transcriptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT NOT NULL,
+  room_id TEXT NOT NULL,
+  timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+  transcript TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_rooms_creator_id ON rooms(creator_id);
@@ -59,6 +69,9 @@ CREATE INDEX IF NOT EXISTS idx_room_participants_room_id ON room_participants(ro
 CREATE INDEX IF NOT EXISTS idx_room_participants_user_id ON room_participants(user_id);
 CREATE INDEX IF NOT EXISTS idx_translation_logs_room_id ON translation_logs(room_id);
 CREATE INDEX IF NOT EXISTS idx_translation_logs_user_id ON translation_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_transcriptions_room_id ON transcriptions(room_id);
+CREATE INDEX IF NOT EXISTS idx_transcriptions_user_id ON transcriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_transcriptions_timestamp ON transcriptions(timestamp);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -66,6 +79,7 @@ ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE room_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE call_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE translation_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transcriptions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for users
 CREATE POLICY "Users can view their own data" ON users
@@ -111,6 +125,13 @@ CREATE POLICY "Anyone can view translation logs" ON translation_logs
 CREATE POLICY "Authenticated users can create translation logs" ON translation_logs
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
+-- RLS Policies for transcriptions
+CREATE POLICY "Anyone can view transcriptions" ON transcriptions
+  FOR SELECT USING (true);
+
+CREATE POLICY "Service role can insert transcriptions" ON transcriptions
+  FOR INSERT WITH CHECK (true);
+
 -- Functions for automatic timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -125,4 +146,4 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_rooms_updated_at BEFORE UPDATE ON rooms
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

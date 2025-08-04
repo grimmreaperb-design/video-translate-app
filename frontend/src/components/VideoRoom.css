@@ -323,4 +323,195 @@
     margin: 20px auto;
     padding: 20px;
   }
+  
+  .transcription-section {
+    margin-top: 15px;
+    padding: 15px;
+  }
+  
+  .transcription-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+  
+  .transcription-controls {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+  
+  .transcription-btn {
+    width: 100%;
+  }
+  
+  .transcriptions-container {
+    max-height: 200px;
+  }
+  
+  .transcription-item {
+    margin-bottom: 10px;
+    padding: 10px;
+  }
+  
+  .transcription-meta {
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-start;
+  }
+}
+
+/* Transcription Styles */
+.transcription-section {
+  margin-top: 30px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.transcription-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.transcription-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.transcription-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.transcription-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #007bff;
+  color: white;
+}
+
+.transcription-btn:hover:not(:disabled) {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
+.transcription-btn.active {
+  background: #dc3545;
+}
+
+.transcription-btn.active:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.transcription-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  opacity: 0.7;
+}
+
+.transcription-status {
+  font-size: 12px;
+  color: #666;
+  font-weight: bold;
+  padding: 5px 10px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+}
+
+.transcription-error {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border: 1px solid #f5c6cb;
+  font-size: 14px;
+}
+
+.transcriptions-container {
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.no-transcriptions {
+  padding: 30px 20px;
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.transcriptions-list {
+  padding: 10px;
+}
+
+.transcription-item {
+  margin-bottom: 15px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #007bff;
+}
+
+.transcription-item:last-child {
+  margin-bottom: 0;
+}
+
+.transcription-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.transcription-user {
+  font-weight: bold;
+  color: #007bff;
+}
+
+.transcription-time {
+  color: #6c757d;
+}
+
+.transcription-text {
+  color: #333;
+  line-height: 1.4;
+  font-size: 14px;
+}
+
+/* Scrollbar styling for transcriptions */
+.transcriptions-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.transcriptions-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.transcriptions-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.transcriptions-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
