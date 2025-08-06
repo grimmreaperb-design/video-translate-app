@@ -29,6 +29,7 @@ interface PeerConnection {
   connection: RTCPeerConnection;
   stream?: MediaStream;
   isConnected: boolean;
+  connectionFailed?: boolean;
 }
 
 interface User {
@@ -234,14 +235,23 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       if (event.candidate && socketRef.current && isComponentMountedRef.current) {
         console.log(`[TEST-LOG] 🔥 STEP 7a: Sending ICE candidate to ${targetUserId}`);
         console.log(`[TEST-LOG] 🧊 ICE candidate being sent:`, event.candidate.candidate?.substring(0, 50) + '...');
-        console.log(`[ICE] Candidate: ${event.candidate.type}, ${event.candidate.protocol}, ${event.candidate.address}`);
+        console.log(`[ICE] 📊 Candidate details:`, {
+          type: event.candidate.type,
+          protocol: event.candidate.protocol,
+          address: event.candidate.address,
+          port: event.candidate.port,
+          priority: event.candidate.priority,
+          foundation: event.candidate.foundation
+        });
+        
         socketRef.current.emit('webrtc-ice-candidate', {
           to: targetUserId,
           candidate: event.candidate
         });
         console.log(`[TEST-LOG] ✅ ICE candidate sent to ${targetUserId}`);
       } else if (!event.candidate) {
-        console.log('[ICE] ✅ ICE gathering completo');
+        console.log(`[ICE] ✅ ICE gathering completo para ${targetUserId}`);
+        console.log(`[ICE] 📊 Estado final: connection=${pc.connectionState}, ice=${pc.iceConnectionState}, gathering=${pc.iceGatheringState}`);
       }
     };
 
@@ -311,8 +321,36 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       
       console.log(`[ICE] 📡 Estado ICE: ${pc.iceConnectionState}`);
       logger.log(`[ICE] Estado ICE com ${targetUserId}: ${pc.iceConnectionState}`);
-      if (pc.iceConnectionState === 'failed') {
+      
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        console.log(`[ICE] ✅ Conexão ICE estabelecida com ${targetUserId}`);
+        // Atualizar estado da conexão
+        setPeerConnections(prev => 
+          prev.map(conn => 
+            conn.userId === targetUserId 
+              ? { ...conn, isConnected: true }
+              : conn
+          )
+        );
+      } else if (pc.iceConnectionState === 'failed') {
         logger.error(`[ICE] ❌ Conexão ICE falhou com ${targetUserId}`);
+        // Tentar reiniciar ICE imediatamente quando falha
+        try {
+          console.log(`[ICE] 🔄 Reiniciando ICE devido a falha para ${targetUserId}`);
+          pc.restartIce();
+        } catch (error) {
+          console.error(`[ICE] ❌ Erro ao reiniciar ICE: ${error}`);
+        }
+      } else if (pc.iceConnectionState === 'disconnected') {
+        console.warn(`[ICE] ⚠️ Conexão ICE desconectada com ${targetUserId}`);
+        // Marcar como desconectado
+        setPeerConnections(prev => 
+          prev.map(conn => 
+            conn.userId === targetUserId 
+              ? { ...conn, isConnected: false }
+              : conn
+          )
+        );
       }
     };
 
@@ -326,20 +364,55 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       }
     };
 
-    // Timeout para conexão ICE (10 segundos)
-    setTimeout(() => {
-      if (
-        pc.iceConnectionState !== 'connected' &&
-        pc.iceConnectionState !== 'completed'
-      ) {
-        console.warn(`[ICE] ⚠️ Timeout após 10s. Reiniciando ICE para ${targetUserId}.`);
+    // 🚨 CORREÇÃO: Timeout mais longo e mais inteligente para conexão ICE
+    const iceTimeoutId = setTimeout(() => {
+      if (!isComponentMountedRef.current) return;
+      
+      const currentState = pc.iceConnectionState;
+      console.log(`[ICE] 🕐 Verificando estado após 15s para ${targetUserId}: ${currentState}`);
+      
+      if (currentState !== 'connected' && currentState !== 'completed') {
+        console.warn(`[ICE] ⚠️ Timeout após 15s. Estado atual: ${currentState}. Reiniciando ICE para ${targetUserId}.`);
         try {
           pc.restartIce();
+          
+          // Segundo timeout para verificar se o restart funcionou
+          setTimeout(() => {
+            if (!isComponentMountedRef.current) return;
+            const newState = pc.iceConnectionState;
+            console.log(`[ICE] 🕐 Estado após restart (5s): ${newState} para ${targetUserId}`);
+            
+            if (newState !== 'connected' && newState !== 'completed') {
+              console.error(`[ICE] ❌ Falha definitiva na conexão com ${targetUserId} após restart`);
+              // Marcar como falha definitiva
+              setPeerConnections(prev => 
+                prev.map(conn => 
+                  conn.userId === targetUserId 
+                    ? { ...conn, isConnected: false, connectionFailed: true }
+                    : conn
+                )
+              );
+            }
+          }, 5000);
+          
         } catch (error) {
           console.error(`[ICE] ❌ Erro ao reiniciar ICE: ${error}`);
         }
       }
-    }, 10000);
+    }, 15000); // Aumentado para 15 segundos
+
+    // Limpar timeout quando a conexão for estabelecida
+    const originalOnIceConnectionStateChange = pc.oniceconnectionstatechange;
+    pc.oniceconnectionstatechange = (event) => {
+      if (originalOnIceConnectionStateChange) {
+        originalOnIceConnectionStateChange.call(pc, event);
+      }
+      
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        clearTimeout(iceTimeoutId);
+        console.log(`[ICE] ✅ Timeout cancelado - conexão estabelecida com ${targetUserId}`);
+      }
+    };
 
     peerConnectionsRef.current.set(targetUserId, pc);
     // 🔧 2. Confirmar se peerConnectionsRef.current.set() está realmente sendo chamado
@@ -636,14 +709,43 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       
       const pc = peerConnectionsRef.current.get(data.from);
       if (pc) {
-        await pc.addIceCandidate(data.candidate);
-        console.log(`[TEST-LOG] ✅ ICE candidate processed for ${data.from}`);
-        console.log(`[TEST-LOG] 🔗 ICE connection state: ${pc.iceConnectionState}`);
+        console.log(`[ICE] 📊 Estado antes de adicionar candidate: connection=${pc.connectionState}, ice=${pc.iceConnectionState}, signaling=${pc.signalingState}`);
+        
+        // Verificar se a conexão está no estado correto para receber ICE candidates
+        if (pc.remoteDescription) {
+          console.log(`[ICE] 📊 Candidate details:`, {
+            type: data.candidate.candidate?.split(' ')[7] || 'unknown',
+            protocol: data.candidate.candidate?.split(' ')[2] || 'unknown',
+            address: data.candidate.candidate?.split(' ')[4] || 'unknown',
+            port: data.candidate.candidate?.split(' ')[5] || 'unknown'
+          });
+          
+          await pc.addIceCandidate(data.candidate);
+          console.log(`[TEST-LOG] ✅ ICE candidate processed for ${data.from}`);
+          console.log(`[ICE] 📊 Estado após adicionar candidate: connection=${pc.connectionState}, ice=${pc.iceConnectionState}`);
+        } else {
+          console.warn(`[ICE] ⚠️ Tentando adicionar ICE candidate antes de setRemoteDescription para ${data.from}`);
+          console.log(`[ICE] 📊 Estado atual: signaling=${pc.signalingState}, remoteDescription=${!!pc.remoteDescription}`);
+          
+          // Tentar adicionar mesmo assim (pode funcionar em alguns casos)
+          try {
+            await pc.addIceCandidate(data.candidate);
+            console.log(`[ICE] ✅ ICE candidate adicionado mesmo sem remoteDescription para ${data.from}`);
+          } catch (candidateError) {
+            console.error(`[ICE] ❌ Falha ao adicionar candidate sem remoteDescription:`, candidateError);
+          }
+        }
       } else {
         console.warn(`[TEST-LOG] ⚠️ No peer connection found for ICE candidate from ${data.from}`);
+        console.log(`[ICE] 📊 Conexões disponíveis:`, Array.from(peerConnectionsRef.current.keys()));
       }
     } catch (error) {
       console.error(`[TEST-LOG] ❌ Error handling ICE candidate from ${data?.from || 'undefined'}:`, error);
+      console.error(`[ICE] ❌ Detalhes do erro:`, {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack?.split('\n')[0] : 'No stack trace'
+      });
     }
   }, []);
 
