@@ -8,6 +8,12 @@ import './VideoRoom.css';
 logger.log('🚀 VideoRoom carregado!');
 logger.log('🔍 Sistema de logs inteligente ativo');
 
+// 🔥 LOGS DE PRODUÇÃO PARA DIAGNÓSTICO
+console.log('🚀 [PROD-DEBUG] VideoRoom carregado - versão 1.1.0');
+console.log('🔍 [PROD-DEBUG] Sistema de logs de produção ativo');
+console.log('🌐 [PROD-DEBUG] Environment:', process.env.NODE_ENV);
+console.log('🔗 [PROD-DEBUG] Socket URL:', SOCKET_URL);
+
 // Configurar handlers globais de erro (seguros para produção)
 setupGlobalErrorHandler();
 
@@ -47,6 +53,13 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   logger.log(`🏠 Sala: ${roomId}`);
   logger.log('🔍 Diagnóstico ativo - logs habilitados');
   
+  // 🔥 LOGS DE PRODUÇÃO DETALHADOS
+  console.log('🎯 [PROD-DEBUG] VideoRoom INICIADO!');
+  console.log(`👤 [PROD-DEBUG] Usuário: ${userName}`);
+  console.log(`🏠 [PROD-DEBUG] Sala: ${roomId}`);
+  console.log('🔍 [PROD-DEBUG] Diagnóstico ativo - logs de produção habilitados');
+  console.log('📱 [PROD-DEBUG] User Agent:', navigator.userAgent);
+  console.log('🌐 [PROD-DEBUG] Location:', window.location.href);
   const [peerConnections, setPeerConnections] = useState<PeerConnection[]>([]);
   const [error, setError] = useState('');
   const [usersInRoom, setUsersInRoom] = useState<User[]>([]);
@@ -75,10 +88,20 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     lastError: null
   });
 
-  // ICE servers configuration
+  // ICE servers configuration - Incluindo TURN servers para NAT traversal
   const iceServers = useMemo(() => [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
+    { urls: 'stun:stun1.l.google.com:19302' },
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
   ], []);
 
   // Calculate exponential backoff delay with jitter
@@ -175,13 +198,19 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       console.warn(`[peer] ⚠️ No local stream available when creating connection to ${targetUserId}`);
     }
 
-    // Handle ICE candidates
+    // Handle ICE candidates - Logs de diagnóstico melhorados
     pc.onicecandidate = (event) => {
       if (event.candidate && socketRef.current && isComponentMountedRef.current) {
+        console.log(`[TEST-LOG] 🔥 STEP 7a: Sending ICE candidate to ${targetUserId}`);
+        console.log(`[TEST-LOG] 🧊 ICE candidate being sent:`, event.candidate.candidate?.substring(0, 50) + '...');
+        console.log(`[ICE] Candidate: ${event.candidate.type}, ${event.candidate.protocol}, ${event.candidate.address}`);
         socketRef.current.emit('webrtc-ice-candidate', {
           to: targetUserId,
           candidate: event.candidate
         });
+        console.log(`[TEST-LOG] ✅ ICE candidate sent to ${targetUserId}`);
+      } else if (!event.candidate) {
+        console.log('[ICE] ✅ ICE gathering completo');
       }
     };
 
@@ -189,9 +218,12 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     pc.ontrack = (event) => {
       if (!isComponentMountedRef.current) return;
       
+      logger.log(`[TEST-LOG] 🔥 STEP 8: ontrack event received from ${targetUserId}`);
       const remoteStream = event.streams[0];
       
       if (remoteStream) {
+        logger.log(`[TEST-LOG] 📹 Stream tracks: ${remoteStream.getTracks().map(t => `${t.kind}: ${t.enabled}`).join(', ')}`);
+        
         setPeerConnections(prev => 
           prev.map(conn => 
             conn.userId === targetUserId 
@@ -199,6 +231,9 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
               : conn
           )
         );
+        logger.log(`[TEST-LOG] ✅ STEP 9: Remote stream assigned to peer connection for ${targetUserId}`);
+      } else {
+        logger.error(`[TEST-LOG] ❌ No remote stream in ontrack event for ${targetUserId}`);
       }
 
       // 🔧 4. Adicionar fallback de reconexão se ontrack não disparar
@@ -217,6 +252,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       if (!isComponentMountedRef.current) return;
       
       const state = pc.connectionState;
+      console.log(`[WebRTC] 🔄 Estado de conexão: ${state}`);
       console.log(`[peer] 🔗 Connection state with ${targetUserId}: ${state}`);
       
       setPeerConnections(prev => 
@@ -238,42 +274,82 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       }
     };
 
-    // Handle ICE connection state changes
+    // Handle ICE connection state changes - Logs melhorados
     pc.oniceconnectionstatechange = () => {
       if (!isComponentMountedRef.current) return;
       
+      console.log(`[ICE] 📡 Estado ICE: ${pc.iceConnectionState}`);
       logger.log(`[ICE] Estado ICE com ${targetUserId}: ${pc.iceConnectionState}`);
       if (pc.iceConnectionState === 'failed') {
         logger.error(`[ICE] ❌ Conexão ICE falhou com ${targetUserId}`);
       }
     };
 
+    // Handle ICE gathering state changes
+    pc.onicegatheringstatechange = () => {
+      if (!isComponentMountedRef.current) return;
+      
+      console.log(`[ICE] 🔍 ICE gathering state: ${pc.iceGatheringState}`);
+      if (pc.iceGatheringState === 'complete') {
+        console.log(`[ICE] ✅ ICE gathering completed for ${targetUserId}`);
+      }
+    };
+
+    // Timeout para conexão ICE (10 segundos)
+    setTimeout(() => {
+      if (
+        pc.iceConnectionState !== 'connected' &&
+        pc.iceConnectionState !== 'completed'
+      ) {
+        console.warn(`[ICE] ⚠️ Timeout após 10s. Reiniciando ICE para ${targetUserId}.`);
+        try {
+          pc.restartIce();
+        } catch (error) {
+          console.error(`[ICE] ❌ Erro ao reiniciar ICE: ${error}`);
+        }
+      }
+    }, 10000);
+
     peerConnectionsRef.current.set(targetUserId, pc);
+    // 🔧 2. Confirmar se peerConnectionsRef.current.set() está realmente sendo chamado
+    console.log(`[TEST-LOG] ✅ PeerConnection adicionada ao mapa para ${targetUserId}`);
     
     return pc;
   }, [iceServers, userId]);
 
   // Create and send offer
   const createOffer = useCallback(async (targetUser: User) => {
+    // 🔧 1. Verifique se há erro de execução ao adicionar o novo usuário
     try {
+      console.log(`[TEST-LOG] 🔥 STEP 2: Creating offer for ${targetUser.name} (${targetUser.id})`);
+      
       const pc = createPeerConnection(targetUser.id, ''); // socketId will be resolved by backend
       if (!pc) {
-        console.error(`Failed to create peer connection for ${targetUser.id}`);
+        console.error(`[TEST-LOG] ❌ Failed to create peer connection for ${targetUser.id}`);
         return;
       }
       
+      console.log(`[TEST-LOG] 🔗 Peer connection created for ${targetUser.id}`);
+      
       const offer = await pc.createOffer();
+      console.log(`[TEST-LOG] 📝 Offer created for ${targetUser.id}:`, offer.type, offer.sdp?.substring(0, 100) + '...');
+      
       await pc.setLocalDescription(offer);
+      console.log(`[TEST-LOG] 📌 Local description set for ${targetUser.id}`);
       
       if (socketRef.current) {
         socketRef.current.emit('webrtc-offer', {
           to: targetUser.id,
           offer
         });
+        console.log(`[TEST-LOG] ✅ STEP 3: Offer sent to ${targetUser.id} via socket`);
       }
 
-      // Store peer connection reference for handleAnswer
+      // 🔥 CORREÇÃO CRÍTICA: Adicionar ao peerConnectionsRef para que handleAnswer possa encontrar
       peerConnectionsRef.current.set(targetUser.id, pc);
+      console.log(`[TEST-LOG] ✅ Peer connection stored in ref for ${targetUser.id}`);
+      // 🔧 2. Confirmar se peerConnectionsRef.current.set() está realmente sendo chamado
+      console.log(`[TEST-LOG] ✅ PeerConnection adicionada ao mapa para ${targetUser.id}`);
 
       setPeerConnections(prev => {
         // Safety check to prevent state corruption
@@ -282,7 +358,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         // Check for duplicates to prevent multiple entries
         const exists = prev.some(conn => conn.userId === targetUser.id);
         if (exists) {
-          logger.warn(`Peer connection already exists for ${targetUser.id}, skipping`);
+          logger.warn(`[TEST-LOG] ⚠️ Peer connection already exists for ${targetUser.id}, skipping`);
           return prev;
         }
         
@@ -294,7 +370,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         }];
       });
     } catch (error) {
-      console.error('Error creating offer for new user:', error);
+      console.error('[FATAL] ❌ Erro ao criar offer para novo usuário:', error);
     }
   }, [createPeerConnection]);
 
@@ -302,43 +378,46 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleOffer = useCallback(async (data: { from: string; offer: RTCSessionDescriptionInit }) => {
     try {
+      console.log(`[TEST-LOG] 🔥 STEP 4: Received offer from ${data?.from || 'undefined'}`);
+      console.log(`[TEST-LOG] 📝 Offer details:`, data?.offer?.type, data?.offer?.sdp?.substring(0, 100) + '...');
+      
       if (!data || !data.offer) {
-        console.error('Received offer with invalid data:', data);
+        console.error('[TEST-LOG] ❌ Received offer with invalid data:', data);
         return;
       }
       
       if (!data.from) {
-        console.error('Received offer with undefined from field');
+        console.error('[TEST-LOG] ❌ Received offer with undefined from field');
         return;
       }
 
-      // Check if connection already exists to avoid duplicates
+      // 🚨 CORREÇÃO: Verificar se já existe uma conexão para evitar duplicatas
       const existingPc = peerConnectionsRef.current.get(data.from);
       if (existingPc) {
         console.log(`[RTC-STATE] Existing connection state: ${existingPc.signalingState}`);
         
-        // If already stable, ignore new offer
+        // Se já estamos em stable, ignorar nova offer
         if (existingPc.signalingState === 'stable') {
-          console.warn(`Connection already established with ${data.from}, ignoring new offer`);
+          console.warn(`[TEST-LOG] ⚠️ Conexão já estabelecida com ${data.from}, ignorando nova offer`);
           return;
         }
         
-        // If already processing an offer, implement "polite peer" strategy
+        // Se já estamos processando uma offer, implementar "polite peer" strategy
         if (existingPc.signalingState === 'have-remote-offer') {
-          console.warn(`Already processing offer from ${data.from}, ignoring duplicate`);
+          console.warn(`[TEST-LOG] ⚠️ Já processando offer de ${data.from}, ignorando duplicata`);
           return;
         }
         
-        // If we have local offer and receive remote offer (glare condition)
+        // Se temos local offer e recebemos remote offer (glare condition)
         if (existingPc.signalingState === 'have-local-offer') {
-          // Implement polite peer: whoever has smaller ID "wins"
+          // Implementar polite peer: quem tem ID menor "ganha"
           const isPolite = userId < data.from;
           if (isPolite) {
-            console.log(`Glare detected, being polite peer - rollback local offer`);
-            // Rollback our offer and accept theirs
+            console.log(`[TEST-LOG] 🤝 Glare detectado, sendo polite peer - rollback local offer`);
+            // Rollback nossa offer e aceitar a deles
             await existingPc.setLocalDescription({type: 'rollback'});
           } else {
-            console.log(`Glare detected, being impolite peer - ignoring remote offer`);
+            console.log(`[TEST-LOG] 🤝 Glare detectado, sendo impolite peer - ignorando remote offer`);
             return;
           }
         }
@@ -346,132 +425,156 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       
       const pc = existingPc || createPeerConnection(data.from, ''); // socketId will be resolved by backend
       if (!pc) {
-        console.error(`Failed to create peer connection for ${data.from}`);
+        console.error(`[TEST-LOG] ❌ Failed to create peer connection for ${data.from}`);
         return;
       }
       
+      console.log(`[TEST-LOG] 🔗 Peer connection ready for incoming offer from ${data.from}`);
+      console.log(`[RTC-STATE] Before setRemoteDescription(offer): ${pc.signalingState}`);
+      
       await pc.setRemoteDescription(data.offer);
+      console.log(`[TEST-LOG] 📌 Remote description set for ${data.from}`);
+      console.log(`[RTC-STATE] After setRemoteDescription(offer): ${pc.signalingState}`);
       
       const answer = await pc.createAnswer();
+      console.log(`[TEST-LOG] 📝 Answer created for ${data.from}:`, answer.type, answer.sdp?.substring(0, 100) + '...');
+      
       await pc.setLocalDescription(answer);
+      console.log(`[TEST-LOG] 📌 Local description (answer) set for ${data.from}`);
+      console.log(`[RTC-STATE] After setLocalDescription(answer): ${pc.signalingState}`);
       
       if (socketRef.current) {
         socketRef.current.emit('webrtc-answer', {
           to: data.from,
           answer
         });
+        console.log(`[TEST-LOG] ✅ STEP 5: Answer sent to ${data.from} via socket`);
       }
 
-      // Store peer connection reference
-      peerConnectionsRef.current.set(data.from, pc);
-
-      setPeerConnections(prev => {
-        // Safety check to prevent state corruption
-        if (!isComponentMountedRef.current) return prev;
+      // 🔥 CORREÇÃO CRÍTICA: Adicionar ao peerConnectionsRef para que ICE candidates possam encontrar
+      if (!existingPc) {
+        peerConnectionsRef.current.set(data.from, pc);
+        console.log(`[TEST-LOG] ✅ Peer connection stored in ref for ${data.from}`);
         
-        // Check for duplicates to prevent multiple entries
-        const exists = prev.some(conn => conn.userId === data.from);
-        if (exists) {
-          logger.log(`Peer connection already exists for ${data.from}, skipping`, 'warn');
-          return prev;
-        }
-        
-        return [...prev, { 
-          userId: data.from, 
-          socketId: '', // Will be updated when we get the socket mapping
-          connection: pc,
-          isConnected: false
-        }];
-      });
+        setPeerConnections(prev => {
+          // Safety check to prevent state corruption
+          if (!isComponentMountedRef.current) return prev;
+          
+          // Check for duplicates to prevent multiple entries
+          const exists = prev.some(conn => conn.userId === data.from);
+          if (exists) {
+            logger.log(`[TEST-LOG] ⚠️ Peer connection already exists for ${data.from}, skipping`, 'warn');
+            return prev;
+          }
+          
+          return [...prev, { 
+            userId: data.from, 
+            socketId: '', // Will be updated when we get the socket mapping
+            connection: pc,
+            isConnected: false
+          }];
+        });
+      }
     } catch (error) {
-      console.error(`Error handling offer from ${data.from}:`, error);
+      console.error(`[TEST-LOG] ❌ Error handling offer from ${data.from}:`, error);
     }
-  }, [createPeerConnection, userId]);
+  }, []);
 
   // Handle incoming answer
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleAnswer = useCallback(async (data: { from: string; answer: RTCSessionDescriptionInit }) => {
     try {
-      if (!data || !data.answer) {
-        console.error('Received answer with invalid data:', data);
+      console.log(`[TEST-LOG] 🔥 STEP 6: Received answer from ${data?.from || 'undefined'}`);
+      console.log(`[TEST-LOG] 📝 Answer details:`, data?.answer?.type, data?.answer?.sdp?.substring(0, 100) + '...');
+      
+      if (!data || !data.from) {
+        console.error('[TEST-LOG] ❌ Received answer with invalid data:', data);
         return;
       }
       
       if (!data.answer) {
-        console.error('Received answer without answer data from', data.from);
+        console.error('[TEST-LOG] ❌ Received answer without answer data from', data.from);
         return;
       }
 
-      // Check for duplicate answers
-       if (answersReceivedRef.current.has(data.from)) {
-         console.warn(`Answer already processed for ${data.from}, ignoring duplicate`);
-         return;
-       }
-
+      // 🚨 CORREÇÃO: Verificar se já processamos answer deste peer
+      if (answersReceivedRef.current.has(data.from)) {
+        console.warn(`[TEST-LOG] ⚠️ Answer já processada para ${data.from}, ignorando duplicata`);
+        return;
+      }
+      
       const pc = peerConnectionsRef.current.get(data.from);
       if (!pc) {
-        console.error(`CRITICAL: No peer connection found for answer from ${data.from}`);
-        console.error(`This should not happen - peer connection should exist from createOffer or handleOffer`);
-        console.error(`Available connections:`, Array.from(peerConnectionsRef.current.keys()));
+        console.error(`[TEST-LOG] ❌ CRITICAL: No peer connection found for answer from ${data.from}`);
+        console.error(`[TEST-LOG] ❌ This should not happen - peer connection should exist from createOffer or handleOffer`);
+        console.error(`[TEST-LOG] ❌ Available connections:`, Array.from(peerConnectionsRef.current.keys()));
         return;
       }
 
-      // Validate signaling state
+      // 🚨 CORREÇÃO CRÍTICA: Verificar estado antes de setRemoteDescription(answer)
+      console.log(`[RTC-STATE] Before setRemoteDescription: ${pc.signalingState}`);
+      
+      // Proteger contra múltiplas chamadas de setRemoteDescription(answer)
       if (pc.signalingState === 'stable') {
-        console.warn(`Already in stable state, ignoring new answer from ${data.from}`);
+        console.warn(`[TEST-LOG] ⚠️ Já em estado stable, ignorando nova answer de ${data.from}`);
         return;
       }
-
-      // Check if remote description is already set
+      
+      // Verificar se já temos uma remote description
       if (pc.remoteDescription && pc.remoteDescription.type === 'answer') {
-        console.warn(`Remote answer already set for ${data.from}, ignoring duplicate`);
+        console.warn(`[TEST-LOG] ⚠️ Remote answer já definida para ${data.from}, ignorando duplicata`);
         return;
       }
-
-      // Validate expected state for answer
+      
+      // Verificar se estamos no estado correto para receber answer
       if (pc.signalingState !== 'have-local-offer') {
-        console.warn(`Incorrect state for answer: ${pc.signalingState}, expected: have-local-offer`);
+        console.warn(`[TEST-LOG] ⚠️ Estado incorreto para answer: ${pc.signalingState}, esperado: have-local-offer`);
         return;
       }
 
-      // Mark as processed before setting to prevent race conditions
-       answersReceivedRef.current.add(data.from);
-       
-       await pc.setRemoteDescription(data.answer);
-       console.log(`Answer processed and remote description set for ${data.from}`);
-       console.log(`Connection state: ${pc.connectionState}, ICE state: ${pc.iceConnectionState}`);
-       
-     } catch (error) {
-       console.error(`Error handling answer from ${data?.from || 'undefined'}:`, error);
-       // Remove from processed set on error to allow retry
-       if (data?.from) {
-         answersReceivedRef.current.delete(data.from);
-       }
+      // 🚨 MARCAR como processada ANTES de processar para evitar race conditions
+      answersReceivedRef.current.add(data.from);
+
+      await pc.setRemoteDescription(data.answer);
+      console.log(`[TEST-LOG] ✅ Answer processed and remote description set for ${data.from}`);
+      console.log(`[TEST-LOG] 🔗 Connection state: ${pc.connectionState}, ICE state: ${pc.iceConnectionState}`);
+      console.log(`[RTC-STATE] After setRemoteDescription: ${pc.signalingState}`);
+      
+    } catch (error) {
+      console.error(`[TEST-LOG] ❌ Error handling answer from ${data?.from || 'undefined'}:`, error);
+      // 🚨 REMOVER da lista se houve erro para permitir retry
+      if (data?.from) {
+        answersReceivedRef.current.delete(data.from);
+      }
     }
   }, []);
 
-  // Handle incoming ICE candidate
-  const handleIceCandidate = useCallback(async (data: { from: string; candidate: RTCIceCandidate }) => {
+  // Handle ICE candidate
+  const handleIceCandidate = useCallback(async (data: { from: string; candidate: RTCIceCandidateInit }) => {
     try {
-      if (!data || !data.candidate) {
-        console.error('Received ICE candidate with invalid data:', data);
+      console.log(`[TEST-LOG] 🔥 STEP 7: Received ICE candidate from ${data?.from || 'undefined'}`);
+      console.log(`[TEST-LOG] 🧊 ICE candidate:`, data?.candidate?.candidate?.substring(0, 50) + '...');
+      
+      if (!data || !data.from) {
+        console.error('[TEST-LOG] ❌ Received ICE candidate with invalid data:', data);
         return;
       }
       
       if (!data.candidate) {
-        console.error('Received ICE candidate without candidate data from', data.from);
+        console.error('[TEST-LOG] ❌ Received ICE candidate without candidate data from', data.from);
         return;
       }
-
+      
       const pc = peerConnectionsRef.current.get(data.from);
       if (pc) {
         await pc.addIceCandidate(data.candidate);
-        console.log(`ICE candidate processed for ${data.from}`);
-        console.log(`ICE connection state: ${pc.iceConnectionState}`);
+        console.log(`[TEST-LOG] ✅ ICE candidate processed for ${data.from}`);
+        console.log(`[TEST-LOG] 🔗 ICE connection state: ${pc.iceConnectionState}`);
       } else {
-        console.warn(`No peer connection found for ICE candidate from ${data.from}`);
+        console.warn(`[TEST-LOG] ⚠️ No peer connection found for ICE candidate from ${data.from}`);
       }
     } catch (error) {
-      console.error(`Error handling ICE candidate from ${data?.from || 'undefined'}:`, error);
+      console.error(`[TEST-LOG] ❌ Error handling ICE candidate from ${data?.from || 'undefined'}:`, error);
     }
   }, []);
 
@@ -538,6 +641,13 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       const transports = getSocketTransports(socketUrl);
       
       console.log('Initializing socket connection...');
+      console.log('🔥 [PROD-DEBUG] Inicializando conexão socket...');
+      console.log(`🔥 [PROD-DEBUG] Socket URL: ${socketUrl}`);
+      console.log(`🔥 [PROD-DEBUG] Transports: ${JSON.stringify(transports)}`);
+      console.log(`🔥 [PROD-DEBUG] Room ID: ${roomId}`);
+      console.log(`🔥 [PROD-DEBUG] User ID: ${userId}`);
+      console.log(`🔥 [PROD-DEBUG] User Name: ${userName}`);
+      
       setConnectionStatus('connecting');
       
       // Disconnect existing socket if any
@@ -562,6 +672,11 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         if (!isComponentMountedRef.current) return;
         
         console.log('Socket connected successfully');
+        console.log('🔥 [PROD-DEBUG] Socket conectado com sucesso!');
+        console.log(`🔥 [PROD-DEBUG] Socket ID: ${socket.id}`);
+        console.log(`🔥 [PROD-DEBUG] Socket URL: ${socketUrl}`);
+        console.log(`🔥 [PROD-DEBUG] Transports: ${JSON.stringify(transports)}`);
+        
         setConnectionStatus('connected');
         setError('');
         resetReconnectionState();
@@ -575,6 +690,11 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         setTimeout(() => {
           if (isComponentMountedRef.current && socketRef.current?.connected) {
             console.log('Joining room:', roomId);
+            console.log('🔥 [PROD-DEBUG] Entrando na sala...');
+            console.log(`🔥 [PROD-DEBUG] Room ID: ${roomId}`);
+            console.log(`🔥 [PROD-DEBUG] User ID: ${userId}`);
+            console.log(`🔥 [PROD-DEBUG] User Name: ${userName}`);
+            
             // Join room with correct format
             socket.emit('join-room', { 
               roomId, 
@@ -583,6 +703,8 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
                 name: userName 
               } 
             });
+            
+            console.log('🔥 [PROD-DEBUG] Evento join-room emitido!');
           }
         }, 100);
       });
@@ -591,6 +713,9 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         if (!isComponentMountedRef.current) return;
         
         console.log(`Socket disconnected: ${reason}`);
+        console.log(`🔥 [PROD-DEBUG] Socket desconectado: ${reason}`);
+        console.log(`🔥 [PROD-DEBUG] Socket ID: ${socket.id}`);
+        
         setConnectionStatus('disconnected');
         
         // Store the disconnect reason for debugging
@@ -607,6 +732,9 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         
         const errorMsg = error.message || error.toString();
         console.error('Socket connection error:', errorMsg);
+        console.error('🔥 [PROD-DEBUG] Erro de conexão socket:', errorMsg);
+        console.error('🔥 [PROD-DEBUG] Error object:', error);
+        console.error('🔥 [PROD-DEBUG] Socket URL:', socketUrl);
         
         setConnectionStatus('disconnected');
         setError(`Erro de conexão: ${errorMsg}`);
@@ -619,6 +747,10 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         if (!isComponentMountedRef.current) return;
         
         try {
+          console.log('🔥 [PROD-DEBUG] Evento room-users recebido!');
+          console.log(`🔥 [PROD-DEBUG] Número de usuários: ${users?.length || 0}`);
+          console.log(`🔥 [PROD-DEBUG] Lista de usuários:`, users);
+          
           logger.warn(`[ROOM-DEBUG] 👥 Room users received for room ${roomId}:`);
           logger.warn(`[ROOM-DEBUG] 📊 Number of users: ${users?.length || 0}`);
           logger.warn(`[ROOM-DEBUG] 👤 Current user: ${userName} (${userId})`);
@@ -757,16 +889,46 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
           return;
         }
         
-        setUsersInRoom(prev => prev.filter(user => user.id !== userIdLeft));
+        // 🚀 MELHORIA v1.1.0: Limpeza completa quando usuário sai
+        console.log(`[v1.1.0] 🧹 Removendo usuário ${userIdLeft} completamente da sala`);
         
-        // Close and cleanup peer connection
-        const pc = peerConnectionsRef.current.get(userIdLeft);
-        if (pc) {
-          console.log(`[peer] 🧹 Closing connection to ${userIdLeft}`);
-          pc.close();
-          peerConnectionsRef.current.delete(userIdLeft);
-        }
-        setPeerConnections(prev => prev.filter(conn => conn.userId !== userIdLeft));
+        // 1. Remove usuário da lista de usuários na sala
+        setUsersInRoom(prev => {
+          const filtered = prev.filter(user => user.id !== userIdLeft);
+          console.log(`[v1.1.0] 👥 Usuários restantes: ${filtered.length}`);
+          return filtered;
+        });
+        
+        // 2. Fechar e limpar conexão peer
+         const pc = peerConnectionsRef.current.get(userIdLeft);
+         if (pc) {
+           console.log(`[v1.1.0] 🔌 Fechando conexão peer para ${userIdLeft}`);
+           try {
+             // Parar todas as tracks dos receivers remotos
+             pc.getReceivers().forEach(receiver => {
+               if (receiver.track) {
+                 receiver.track.stop();
+                 console.log(`[v1.1.0] ⏹️ Parou track ${receiver.track.kind} de ${userIdLeft}`);
+               }
+             });
+             pc.close();
+           } catch (error) {
+             console.warn(`[v1.1.0] ⚠️ Erro ao fechar conexão para ${userIdLeft}:`, error);
+           }
+           peerConnectionsRef.current.delete(userIdLeft);
+         }
+        
+        // 3. Remover conexão da lista de peer connections (isso remove o vídeo da UI)
+        setPeerConnections(prev => {
+          const filtered = prev.filter(conn => conn.userId !== userIdLeft);
+          console.log(`[v1.1.0] 📹 Conexões de vídeo restantes: ${filtered.length}`);
+          return filtered;
+        });
+        
+        // 4. Limpar qualquer referência de answer processada
+        answersReceivedRef.current.delete(userIdLeft);
+        
+        console.log(`[v1.1.0] ✅ Usuário ${userIdLeft} removido completamente da sala`);
       });
 
       // WebRTC signaling events
@@ -1010,17 +1172,23 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
                     
                     if (peer.stream) {
                       try {
+                        logger.log(`[TEST-LOG] 🔥 STEP 10: Assigning stream to video element for ${peer.userId}`);
+                        logger.log(`[TEST-LOG] 📹 Stream ID: ${peer.stream.id}`);
+                        logger.log(`[TEST-LOG] 📹 Stream tracks: ${peer.stream.getTracks().map(t => `${t.kind}: ${t.enabled}`).join(', ')}`);
+                        
                         // Only set if different to avoid unnecessary DOM updates
                         if (videoElement.srcObject !== peer.stream) {
                           videoElement.srcObject = peer.stream;
+                          logger.log(`[TEST-LOG] ✅ STEP 11: Video element srcObject assigned for ${peer.userId}`);
                         }
                       } catch (error) {
-                        logger.error(`Error setting video source for ${peer.userId}: ${error}`);
+                        logger.error(`[TEST-LOG] ❌ Error setting video source for ${peer.userId}: ${error}`);
                       }
                     } else {
                       // Clear srcObject if no stream to prevent stale references
                       if (videoElement.srcObject) {
                         videoElement.srcObject = null;
+                        logger.log(`[TEST-LOG] 🧹 Cleared video srcObject for ${peer.userId}`);
                       }
                     }
                   }}
