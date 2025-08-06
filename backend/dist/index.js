@@ -40,7 +40,9 @@ app.get('/api/health', (req, res) => {
         message: 'Video Translate Backend is running',
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || 'development',
-        port: process.env.PORT || 3001
+        port: process.env.PORT || 3001,
+        version: '1.0.1',
+        deployTime: '2025-08-06T00:21:00Z'
     });
 });
 // Endpoint raiz para verificação básica
@@ -234,3 +236,4 @@ process.on('SIGINT', () => {
         console.log('Process terminated');
     });
 });
+//# sourceMappingURL=index.js.map
