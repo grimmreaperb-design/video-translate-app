@@ -3,9 +3,7 @@
 const BACKEND_URLS = {
   // URLs de produção (em ordem de prioridade)
   production: [
-    'https://video-translate-backend-wv9b.onrender.com', // Render (suporta WebSocket) - URL FUNCIONANDO
-    'https://video-translate-backend.onrender.com', // Render alternativo (se existir)
-    'https://video-translate-app-backend.railway.app', // Railway (suporta WebSocket)
+    'https://video-translate-app.onrender.com', // Render (suporta WebSocket)
   ],
   // URL de desenvolvimento
   development: 'http://localhost:3001'

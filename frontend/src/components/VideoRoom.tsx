@@ -178,13 +178,10 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate && socketRef.current && isComponentMountedRef.current) {
-        console.log(`[TEST-LOG] 🔥 STEP 7a: Sending ICE candidate to ${targetUserId}`);
-        console.log(`[TEST-LOG] 🧊 ICE candidate being sent:`, event.candidate.candidate?.substring(0, 50) + '...');
         socketRef.current.emit('webrtc-ice-candidate', {
           to: targetUserId,
           candidate: event.candidate
         });
-        console.log(`[TEST-LOG] ✅ ICE candidate sent to ${targetUserId}`);
       }
     };
 
@@ -192,12 +189,9 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     pc.ontrack = (event) => {
       if (!isComponentMountedRef.current) return;
       
-      logger.log(`[TEST-LOG] 🔥 STEP 8: ontrack event received from ${targetUserId}`);
       const remoteStream = event.streams[0];
       
       if (remoteStream) {
-        logger.log(`[TEST-LOG] 📹 Stream tracks: ${remoteStream.getTracks().map(t => `${t.kind}: ${t.enabled}`).join(', ')}`);
-        
         setPeerConnections(prev => 
           prev.map(conn => 
             conn.userId === targetUserId 
@@ -205,9 +199,6 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
               : conn
           )
         );
-        logger.log(`[TEST-LOG] ✅ STEP 9: Remote stream assigned to peer connection for ${targetUserId}`);
-      } else {
-        logger.error(`[TEST-LOG] ❌ No remote stream in ontrack event for ${targetUserId}`);
       }
 
       // 🔧 4. Adicionar fallback de reconexão se ontrack não disparar
@@ -258,45 +249,31 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     };
 
     peerConnectionsRef.current.set(targetUserId, pc);
-    // 🔧 2. Confirmar se peerConnectionsRef.current.set() está realmente sendo chamado
-    console.log(`[TEST-LOG] ✅ PeerConnection adicionada ao mapa para ${targetUserId}`);
     
     return pc;
   }, [iceServers, userId]);
 
   // Create and send offer
   const createOffer = useCallback(async (targetUser: User) => {
-    // 🔧 1. Verifique se há erro de execução ao adicionar o novo usuário
     try {
-      console.log(`[TEST-LOG] 🔥 STEP 2: Creating offer for ${targetUser.name} (${targetUser.id})`);
-      
       const pc = createPeerConnection(targetUser.id, ''); // socketId will be resolved by backend
       if (!pc) {
-        console.error(`[TEST-LOG] ❌ Failed to create peer connection for ${targetUser.id}`);
+        console.error(`Failed to create peer connection for ${targetUser.id}`);
         return;
       }
       
-      console.log(`[TEST-LOG] 🔗 Peer connection created for ${targetUser.id}`);
-      
       const offer = await pc.createOffer();
-      console.log(`[TEST-LOG] 📝 Offer created for ${targetUser.id}:`, offer.type, offer.sdp?.substring(0, 100) + '...');
-      
       await pc.setLocalDescription(offer);
-      console.log(`[TEST-LOG] 📌 Local description set for ${targetUser.id}`);
       
       if (socketRef.current) {
         socketRef.current.emit('webrtc-offer', {
           to: targetUser.id,
           offer
         });
-        console.log(`[TEST-LOG] ✅ STEP 3: Offer sent to ${targetUser.id} via socket`);
       }
 
-      // 🔥 CORREÇÃO CRÍTICA: Adicionar ao peerConnectionsRef para que handleAnswer possa encontrar
+      // Store peer connection reference for handleAnswer
       peerConnectionsRef.current.set(targetUser.id, pc);
-      console.log(`[TEST-LOG] ✅ Peer connection stored in ref for ${targetUser.id}`);
-      // 🔧 2. Confirmar se peerConnectionsRef.current.set() está realmente sendo chamado
-      console.log(`[TEST-LOG] ✅ PeerConnection adicionada ao mapa para ${targetUser.id}`);
 
       setPeerConnections(prev => {
         // Safety check to prevent state corruption
@@ -305,7 +282,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         // Check for duplicates to prevent multiple entries
         const exists = prev.some(conn => conn.userId === targetUser.id);
         if (exists) {
-          logger.warn(`[TEST-LOG] ⚠️ Peer connection already exists for ${targetUser.id}, skipping`);
+          logger.warn(`Peer connection already exists for ${targetUser.id}, skipping`);
           return prev;
         }
         
@@ -317,7 +294,7 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
         }];
       });
     } catch (error) {
-      console.error('[FATAL] ❌ Erro ao criar offer para novo usuário:', error);
+      console.error('Error creating offer for new user:', error);
     }
   }, [createPeerConnection]);
 
@@ -325,46 +302,43 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleOffer = useCallback(async (data: { from: string; offer: RTCSessionDescriptionInit }) => {
     try {
-      console.log(`[TEST-LOG] 🔥 STEP 4: Received offer from ${data?.from || 'undefined'}`);
-      console.log(`[TEST-LOG] 📝 Offer details:`, data?.offer?.type, data?.offer?.sdp?.substring(0, 100) + '...');
-      
       if (!data || !data.offer) {
-        console.error('[TEST-LOG] ❌ Received offer with invalid data:', data);
+        console.error('Received offer with invalid data:', data);
         return;
       }
       
       if (!data.from) {
-        console.error('[TEST-LOG] ❌ Received offer with undefined from field');
+        console.error('Received offer with undefined from field');
         return;
       }
 
-      // 🚨 CORREÇÃO: Verificar se já existe uma conexão para evitar duplicatas
+      // Check if connection already exists to avoid duplicates
       const existingPc = peerConnectionsRef.current.get(data.from);
       if (existingPc) {
         console.log(`[RTC-STATE] Existing connection state: ${existingPc.signalingState}`);
         
-        // Se já estamos em stable, ignorar nova offer
+        // If already stable, ignore new offer
         if (existingPc.signalingState === 'stable') {
-          console.warn(`[TEST-LOG] ⚠️ Conexão já estabelecida com ${data.from}, ignorando nova offer`);
+          console.warn(`Connection already established with ${data.from}, ignoring new offer`);
           return;
         }
         
-        // Se já estamos processando uma offer, implementar "polite peer" strategy
+        // If already processing an offer, implement "polite peer" strategy
         if (existingPc.signalingState === 'have-remote-offer') {
-          console.warn(`[TEST-LOG] ⚠️ Já processando offer de ${data.from}, ignorando duplicata`);
+          console.warn(`Already processing offer from ${data.from}, ignoring duplicate`);
           return;
         }
         
-        // Se temos local offer e recebemos remote offer (glare condition)
+        // If we have local offer and receive remote offer (glare condition)
         if (existingPc.signalingState === 'have-local-offer') {
-          // Implementar polite peer: quem tem ID menor "ganha"
+          // Implement polite peer: whoever has smaller ID "wins"
           const isPolite = userId < data.from;
           if (isPolite) {
-            console.log(`[TEST-LOG] 🤝 Glare detectado, sendo polite peer - rollback local offer`);
-            // Rollback nossa offer e aceitar a deles
+            console.log(`Glare detected, being polite peer - rollback local offer`);
+            // Rollback our offer and accept theirs
             await existingPc.setLocalDescription({type: 'rollback'});
           } else {
-            console.log(`[TEST-LOG] 🤝 Glare detectado, sendo impolite peer - ignorando remote offer`);
+            console.log(`Glare detected, being impolite peer - ignoring remote offer`);
             return;
           }
         }
@@ -372,156 +346,132 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       
       const pc = existingPc || createPeerConnection(data.from, ''); // socketId will be resolved by backend
       if (!pc) {
-        console.error(`[TEST-LOG] ❌ Failed to create peer connection for ${data.from}`);
+        console.error(`Failed to create peer connection for ${data.from}`);
         return;
       }
       
-      console.log(`[TEST-LOG] 🔗 Peer connection ready for incoming offer from ${data.from}`);
-      console.log(`[RTC-STATE] Before setRemoteDescription(offer): ${pc.signalingState}`);
-      
       await pc.setRemoteDescription(data.offer);
-      console.log(`[TEST-LOG] 📌 Remote description set for ${data.from}`);
-      console.log(`[RTC-STATE] After setRemoteDescription(offer): ${pc.signalingState}`);
       
       const answer = await pc.createAnswer();
-      console.log(`[TEST-LOG] 📝 Answer created for ${data.from}:`, answer.type, answer.sdp?.substring(0, 100) + '...');
-      
       await pc.setLocalDescription(answer);
-      console.log(`[TEST-LOG] 📌 Local description (answer) set for ${data.from}`);
-      console.log(`[RTC-STATE] After setLocalDescription(answer): ${pc.signalingState}`);
       
       if (socketRef.current) {
         socketRef.current.emit('webrtc-answer', {
           to: data.from,
           answer
         });
-        console.log(`[TEST-LOG] ✅ STEP 5: Answer sent to ${data.from} via socket`);
       }
 
-      // 🔥 CORREÇÃO CRÍTICA: Adicionar ao peerConnectionsRef para que ICE candidates possam encontrar
-      if (!existingPc) {
-        peerConnectionsRef.current.set(data.from, pc);
-        console.log(`[TEST-LOG] ✅ Peer connection stored in ref for ${data.from}`);
+      // Store peer connection reference
+      peerConnectionsRef.current.set(data.from, pc);
+
+      setPeerConnections(prev => {
+        // Safety check to prevent state corruption
+        if (!isComponentMountedRef.current) return prev;
         
-        setPeerConnections(prev => {
-          // Safety check to prevent state corruption
-          if (!isComponentMountedRef.current) return prev;
-          
-          // Check for duplicates to prevent multiple entries
-          const exists = prev.some(conn => conn.userId === data.from);
-          if (exists) {
-            logger.log(`[TEST-LOG] ⚠️ Peer connection already exists for ${data.from}, skipping`, 'warn');
-            return prev;
-          }
-          
-          return [...prev, { 
-            userId: data.from, 
-            socketId: '', // Will be updated when we get the socket mapping
-            connection: pc,
-            isConnected: false
-          }];
-        });
-      }
+        // Check for duplicates to prevent multiple entries
+        const exists = prev.some(conn => conn.userId === data.from);
+        if (exists) {
+          logger.log(`Peer connection already exists for ${data.from}, skipping`, 'warn');
+          return prev;
+        }
+        
+        return [...prev, { 
+          userId: data.from, 
+          socketId: '', // Will be updated when we get the socket mapping
+          connection: pc,
+          isConnected: false
+        }];
+      });
     } catch (error) {
-      console.error(`[TEST-LOG] ❌ Error handling offer from ${data.from}:`, error);
+      console.error(`Error handling offer from ${data.from}:`, error);
     }
-  }, []);
+  }, [createPeerConnection, userId]);
 
   // Handle incoming answer
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleAnswer = useCallback(async (data: { from: string; answer: RTCSessionDescriptionInit }) => {
     try {
-      console.log(`[TEST-LOG] 🔥 STEP 6: Received answer from ${data?.from || 'undefined'}`);
-      console.log(`[TEST-LOG] 📝 Answer details:`, data?.answer?.type, data?.answer?.sdp?.substring(0, 100) + '...');
-      
-      if (!data || !data.from) {
-        console.error('[TEST-LOG] ❌ Received answer with invalid data:', data);
+      if (!data || !data.answer) {
+        console.error('Received answer with invalid data:', data);
         return;
       }
       
       if (!data.answer) {
-        console.error('[TEST-LOG] ❌ Received answer without answer data from', data.from);
+        console.error('Received answer without answer data from', data.from);
         return;
       }
 
-      // 🚨 CORREÇÃO: Verificar se já processamos answer deste peer
-      if (answersReceivedRef.current.has(data.from)) {
-        console.warn(`[TEST-LOG] ⚠️ Answer já processada para ${data.from}, ignorando duplicata`);
-        return;
-      }
-      
+      // Check for duplicate answers
+       if (answersReceivedRef.current.has(data.from)) {
+         console.warn(`Answer already processed for ${data.from}, ignoring duplicate`);
+         return;
+       }
+
       const pc = peerConnectionsRef.current.get(data.from);
       if (!pc) {
-        console.error(`[TEST-LOG] ❌ CRITICAL: No peer connection found for answer from ${data.from}`);
-        console.error(`[TEST-LOG] ❌ This should not happen - peer connection should exist from createOffer or handleOffer`);
-        console.error(`[TEST-LOG] ❌ Available connections:`, Array.from(peerConnectionsRef.current.keys()));
+        console.error(`CRITICAL: No peer connection found for answer from ${data.from}`);
+        console.error(`This should not happen - peer connection should exist from createOffer or handleOffer`);
+        console.error(`Available connections:`, Array.from(peerConnectionsRef.current.keys()));
         return;
       }
 
-      // 🚨 CORREÇÃO CRÍTICA: Verificar estado antes de setRemoteDescription
-      console.log(`[RTC-STATE] Before setRemoteDescription: ${pc.signalingState}`);
-      
-      // Proteger contra múltiplas chamadas de setRemoteDescription(answer)
+      // Validate signaling state
       if (pc.signalingState === 'stable') {
-        console.warn(`[TEST-LOG] ⚠️ Já em estado stable, ignorando nova answer de ${data.from}`);
+        console.warn(`Already in stable state, ignoring new answer from ${data.from}`);
         return;
       }
-      
-      // Verificar se já temos uma remote description
+
+      // Check if remote description is already set
       if (pc.remoteDescription && pc.remoteDescription.type === 'answer') {
-        console.warn(`[TEST-LOG] ⚠️ Remote answer já definida para ${data.from}, ignorando duplicata`);
+        console.warn(`Remote answer already set for ${data.from}, ignoring duplicate`);
         return;
       }
-      
-      // Verificar se estamos no estado correto para receber answer
+
+      // Validate expected state for answer
       if (pc.signalingState !== 'have-local-offer') {
-        console.warn(`[TEST-LOG] ⚠️ Estado incorreto para answer: ${pc.signalingState}, esperado: have-local-offer`);
+        console.warn(`Incorrect state for answer: ${pc.signalingState}, expected: have-local-offer`);
         return;
       }
 
-      // 🚨 MARCAR como processada ANTES de processar para evitar race conditions
-      answersReceivedRef.current.add(data.from);
-
-      await pc.setRemoteDescription(data.answer);
-      console.log(`[TEST-LOG] ✅ Answer processed and remote description set for ${data.from}`);
-      console.log(`[TEST-LOG] 🔗 Connection state: ${pc.connectionState}, ICE state: ${pc.iceConnectionState}`);
-      console.log(`[RTC-STATE] After setRemoteDescription: ${pc.signalingState}`);
-      
-    } catch (error) {
-      console.error(`[TEST-LOG] ❌ Error handling answer from ${data?.from || 'undefined'}:`, error);
-      // 🚨 REMOVER da lista se houve erro para permitir retry
-      if (data?.from) {
-        answersReceivedRef.current.delete(data.from);
-      }
+      // Mark as processed before setting to prevent race conditions
+       answersReceivedRef.current.add(data.from);
+       
+       await pc.setRemoteDescription(data.answer);
+       console.log(`Answer processed and remote description set for ${data.from}`);
+       console.log(`Connection state: ${pc.connectionState}, ICE state: ${pc.iceConnectionState}`);
+       
+     } catch (error) {
+       console.error(`Error handling answer from ${data?.from || 'undefined'}:`, error);
+       // Remove from processed set on error to allow retry
+       if (data?.from) {
+         answersReceivedRef.current.delete(data.from);
+       }
     }
   }, []);
 
-  // Handle ICE candidate
-  const handleIceCandidate = useCallback(async (data: { from: string; candidate: RTCIceCandidateInit }) => {
+  // Handle incoming ICE candidate
+  const handleIceCandidate = useCallback(async (data: { from: string; candidate: RTCIceCandidate }) => {
     try {
-      console.log(`[TEST-LOG] 🔥 STEP 7: Received ICE candidate from ${data?.from || 'undefined'}`);
-      console.log(`[TEST-LOG] 🧊 ICE candidate:`, data?.candidate?.candidate?.substring(0, 50) + '...');
-      
-      if (!data || !data.from) {
-        console.error('[TEST-LOG] ❌ Received ICE candidate with invalid data:', data);
+      if (!data || !data.candidate) {
+        console.error('Received ICE candidate with invalid data:', data);
         return;
       }
       
       if (!data.candidate) {
-        console.error('[TEST-LOG] ❌ Received ICE candidate without candidate data from', data.from);
+        console.error('Received ICE candidate without candidate data from', data.from);
         return;
       }
-      
+
       const pc = peerConnectionsRef.current.get(data.from);
       if (pc) {
         await pc.addIceCandidate(data.candidate);
-        console.log(`[TEST-LOG] ✅ ICE candidate processed for ${data.from}`);
-        console.log(`[TEST-LOG] 🔗 ICE connection state: ${pc.iceConnectionState}`);
+        console.log(`ICE candidate processed for ${data.from}`);
+        console.log(`ICE connection state: ${pc.iceConnectionState}`);
       } else {
-        console.warn(`[TEST-LOG] ⚠️ No peer connection found for ICE candidate from ${data.from}`);
+        console.warn(`No peer connection found for ICE candidate from ${data.from}`);
       }
     } catch (error) {
-      console.error(`[TEST-LOG] ❌ Error handling ICE candidate from ${data?.from || 'undefined'}:`, error);
+      console.error(`Error handling ICE candidate from ${data?.from || 'undefined'}:`, error);
     }
   }, []);
 
@@ -1060,23 +1010,17 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
                     
                     if (peer.stream) {
                       try {
-                        logger.log(`[TEST-LOG] 🔥 STEP 10: Assigning stream to video element for ${peer.userId}`);
-                        logger.log(`[TEST-LOG] 📹 Stream ID: ${peer.stream.id}`);
-                        logger.log(`[TEST-LOG] 📹 Stream tracks: ${peer.stream.getTracks().map(t => `${t.kind}: ${t.enabled}`).join(', ')}`);
-                        
                         // Only set if different to avoid unnecessary DOM updates
                         if (videoElement.srcObject !== peer.stream) {
                           videoElement.srcObject = peer.stream;
-                          logger.log(`[TEST-LOG] ✅ STEP 11: Video element srcObject assigned for ${peer.userId}`);
                         }
                       } catch (error) {
-                        logger.error(`[TEST-LOG] ❌ Error setting video source for ${peer.userId}: ${error}`);
+                        logger.error(`Error setting video source for ${peer.userId}: ${error}`);
                       }
                     } else {
                       // Clear srcObject if no stream to prevent stale references
                       if (videoElement.srcObject) {
                         videoElement.srcObject = null;
-                        logger.log(`[TEST-LOG] 🧹 Cleared video srcObject for ${peer.userId}`);
                       }
                     }
                   }}

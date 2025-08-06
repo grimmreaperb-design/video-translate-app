@@ -1,29 +1,31 @@
-# Video Chat App - WebRTC
+# Video Chat App - WebRTC (v1.0.0)
 
-Uma aplicação simples de videochamada entre duas pessoas usando WebRTC e Socket.IO.
+Uma aplicação simples de videochamada entre duas pessoas usando WebRTC puro e Socket.IO.
 
-## 🚀 Funcionalidades
+## 🚀 Funcionalidades da v1.0.0
 
 - ✅ Videochamada ponto a ponto entre duas pessoas
 - ✅ Acesso à câmera e microfone
-- ✅ Entrada em sala com Room ID
-- ✅ Conexão WebRTC com Socket.IO
-- ✅ Troca de ofertas, respostas e ICE candidates
-- ✅ Interface responsiva e moderna
+- ✅ Sistema de salas com Room ID
+- ✅ Sinalização WebRTC via Socket.IO
+- ✅ Troca automática de ofertas, respostas e ICE candidates
+- ✅ Interface React responsiva e moderna
+- ✅ Logs de debugging detalhados
 
 ## 🛠️ Tecnologias
 
 ### Frontend
-- React 18 + TypeScript
-- Socket.IO Client
-- WebRTC API
+- React 19 + TypeScript
+- Socket.IO Client 4.8.1
+- WebRTC API nativo
+- Simple-peer para WebRTC
 - CSS3 com design responsivo
 
 ### Backend
-- Node.js + Express
-- Socket.IO Server
-- TypeScript
-- CORS configurado para Vercel
+- Node.js + Express 5.1.0
+- Socket.IO Server 4.8.1
+- TypeScript 5.9.2
+- CORS configurado
 
 ## 📦 Instalação e Execução
 
@@ -121,14 +123,13 @@ O projeto usa servidores STUN públicos do Google:
 - `stun:stun.l.google.com:19302`
 - `stun:stun1.l.google.com:19302`
 
-## 📝 Próximos Passos
+## 📝 Versão Atual (1.0.0)
 
-Após confirmar que a videochamada básica está funcionando, podemos adicionar:
-- Sistema de onboarding
-- Integração com IA para tradução
-- Suporte a mais de 2 usuários
-- Gravação de chamadas
-- Chat de texto
+Esta é uma versão estável e funcional com:
+- WebRTC puro sem dependências externas de transcrição
+- Sistema de salas simples e eficiente
+- Interface limpa e responsiva
+- Código base sólido para futuras expansões
 
 ## 🐛 Troubleshooting
 

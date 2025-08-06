@@ -61,13 +61,12 @@ io.on('connection', (socket) => {
     socket.on('join-room', (data) => {
         let roomId;
         let user;
-        console.log(`[TEST-LOG-BACKEND] 🔥 RECEIVED join-room event from socket ${socket.id}`);
-        console.log(`[TEST-LOG-BACKEND] 📦 Data received:`, JSON.stringify(data));
+        console.log(`Received join-room event from socket ${socket.id}`);
         // Handle both old format (just roomId string) and new format (object with roomId and user)
         if (typeof data === 'string') {
             roomId = data;
             user = { id: socket.id, name: `User-${socket.id.slice(0, 6)}` };
-            console.log(`[TEST-LOG-BACKEND] 📝 Old format - User ${user.name} joining room ${roomId}`);
+            console.log(`Old format - User ${user.name} joining room ${roomId}`);
         }
         else {
             roomId = data.roomId;
@@ -75,9 +74,9 @@ io.on('connection', (socket) => {
             // Garantir user válido
             if (!user || !user.id || !user.name) {
                 user = { id: socket.id, name: `User-${socket.id.slice(0, 6)}` };
-                console.log(`[TEST-LOG-BACKEND] ⚠️ Invalid user data received, using fallback: ${user.name} (${user.id})`);
+                console.log(`Invalid user data received, using fallback: ${user.name} (${user.id})`);
             }
-            console.log(`[TEST-LOG-BACKEND] 📝 New format - User ${user.name} (${user.id}) joining room ${roomId}`);
+            console.log(`New format - User ${user.name} (${user.id}) joining room ${roomId}`);
         }
         // Leave any previous room
         if (socketUsers.has(socket.id)) {
@@ -104,31 +103,22 @@ io.on('connection', (socket) => {
             rooms.set(roomId, new Set());
         }
         const room = rooms.get(roomId);
-        // Get current users in the room
-        const currentUsers = Array.from(room).map(socketId => {
-            const userData = socketUsers.get(socketId);
-            return userData ? { id: userData.id, name: userData.name } : null;
-        }).filter(Boolean);
-        // Add user to room and update mappings
-        room.add(socket.id);
-        userSockets.set(user.id, socket.id);
-        socketUsers.set(socket.id, { ...user, roomId });
-        console.log(`[TEST-LOG-BACKEND] 👥 Current users in room ${roomId} BEFORE adding new user:`, currentUsers);
-        console.log(`[TEST-LOG-BACKEND] 🏠 Room ${roomId} size BEFORE: ${room.size - 1}, AFTER: ${room.size}`);
+        // Get current users in room (excluding the new user)
+        const currentUsers = Array.from(room).filter(socketId => socketId !== socket.id).map(socketId => {
+            const userSocket = io.sockets.sockets.get(socketId);
+            return userSocket?.data?.user || { id: socketId, name: `User-${socketId.slice(0, 6)}` };
+        });
+        console.log(`Current users in room ${roomId} BEFORE adding new user:`, currentUsers);
+        console.log(`Room ${roomId} size BEFORE: ${room.size - 1}, AFTER: ${room.size}`);
         // Send current users to the new user
         socket.emit('room-users', currentUsers);
-        console.log(`[TEST-LOG-BACKEND] 📤 Sent room-users event to new user ${user.name} with ${currentUsers.length} existing users`);
-        // Notifica os outros na sala sobre o novo usuário
-        if (user && user.id && user.name) {
-            const userToEmit = { id: user.id, name: user.name };
-            console.log("Emitindo user-joined para sala", roomId, "com usuário:", userToEmit);
-            socket.to(roomId).emit('user-joined', userToEmit);
-            console.log(`[TEST-LOG-BACKEND] 🔥 STEP 1-BACKEND: Notified ${room.size - 1} users in room ${roomId} about new user: ${userToEmit.name} (${userToEmit.id})`);
-        }
-        else {
-            console.warn(`[WARN] Tentativa de emitir user-joined com dados inválidos:`, user);
-        }
-        console.log(`[TEST-LOG-BACKEND] ✅ Room ${roomId} now has ${room.size} users total`);
+        console.log(`Sent room-users event to new user ${user.name} with ${currentUsers.length} existing users`);
+        // Notify existing users about the new user
+        const userToEmit = { id: user.id, name: user.name };
+        socket.to(roomId).emit('user-joined', userToEmit);
+        console.log(`Notified ${room.size - 1} users in room ${roomId} about new user: ${userToEmit.name} (${userToEmit.id})`);
+        // Log final room state
+        console.log(`Room ${roomId} now has ${room.size} users total`);
     });
     // Handle leaving a room
     socket.on('leave-room', () => {
@@ -158,12 +148,12 @@ io.on('connection', (socket) => {
         if (user) {
             const targetSocketId = userSockets.get(data.to);
             if (targetSocketId) {
-                console.log(`[TEST-LOG-BACKEND] 🔥 STEP 2-BACKEND: Offer from ${socket.id} to ${data.to}`);
+                console.log(`Offer from ${socket.id} to ${data.to}`);
                 io.to(targetSocketId).emit('webrtc-offer', {
                     offer: data.offer,
                     from: user.id
                 });
-                console.log(`[TEST-LOG-BACKEND] ✅ Offer forwarded to ${data.to}`);
+                console.log(`Offer forwarded to ${data.to}`);
             }
         }
     });
@@ -173,12 +163,12 @@ io.on('connection', (socket) => {
         if (user) {
             const targetSocketId = userSockets.get(data.to);
             if (targetSocketId) {
-                console.log(`[TEST-LOG-BACKEND] 🔥 STEP 5-BACKEND: Answer from ${socket.id} to ${data.to}`);
+                console.log(`Answer from ${socket.id} to ${data.to}`);
                 io.to(targetSocketId).emit('webrtc-answer', {
                     answer: data.answer,
                     from: user.id
                 });
-                console.log(`[TEST-LOG-BACKEND] ✅ Answer forwarded to ${data.to}`);
+                console.log(`Answer forwarded to ${data.to}`);
             }
         }
     });
@@ -188,12 +178,12 @@ io.on('connection', (socket) => {
         if (user) {
             const targetSocketId = userSockets.get(data.to);
             if (targetSocketId) {
-                console.log(`[TEST-LOG-BACKEND] 🔥 STEP 7-BACKEND: ICE candidate from ${socket.id} to ${data.to}`);
+                console.log(`ICE candidate from ${socket.id} to ${data.to}`);
                 io.to(targetSocketId).emit('webrtc-ice-candidate', {
                     candidate: data.candidate,
                     from: user.id
                 });
-                console.log(`[TEST-LOG-BACKEND] ✅ ICE candidate forwarded to ${data.to}`);
+                console.log(`ICE candidate forwarded to ${data.to}`);
             }
         }
     });
@@ -244,4 +234,3 @@ process.on('SIGINT', () => {
         console.log('Process terminated');
     });
 });
-//# sourceMappingURL=index.js.map
