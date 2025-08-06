@@ -147,11 +147,42 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       
       logger.log(`[PERMISSION] ✅ Acesso à mídia concedido: ${stream.getTracks().map(t => t.kind).join(', ')}`);
       
+      // 🚨 DIAGNÓSTICO: Verificar se o stream tem tracks ativos
+      const videoTracks = stream.getVideoTracks();
+      const audioTracks = stream.getAudioTracks();
+      
+      console.log(`[LOCAL-STREAM] 📹 Video tracks: ${videoTracks.length}, enabled: ${videoTracks.map(t => t.enabled).join(',')}`);
+      console.log(`[LOCAL-STREAM] 🎤 Audio tracks: ${audioTracks.length}, enabled: ${audioTracks.map(t => t.enabled).join(',')}`);
+      
+      if (videoTracks.length === 0) {
+        console.error('[LOCAL-STREAM] ❌ CRÍTICO: Nenhum track de vídeo encontrado!');
+      }
+      
       localStreamRef.current = stream;
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.muted = true; // Mute local video to avoid feedback
+        
+        // 🚨 DIAGNÓSTICO: Verificar se o preview local está funcionando
+        localVideoRef.current.onloadedmetadata = () => {
+          console.log('[LOCAL-STREAM] ✅ Preview local carregado com sucesso');
+          console.log(`[LOCAL-STREAM] 📐 Dimensões: ${localVideoRef.current?.videoWidth}x${localVideoRef.current?.videoHeight}`);
+        };
+        
+        localVideoRef.current.onerror = (error) => {
+          console.error('[LOCAL-STREAM] ❌ Erro no preview local:', error);
+        };
+        
+        // Forçar play do vídeo local
+        try {
+          await localVideoRef.current.play();
+          console.log('[LOCAL-STREAM] ▶️ Preview local iniciado');
+        } catch (playError) {
+          console.warn('[LOCAL-STREAM] ⚠️ Erro ao iniciar preview:', playError);
+        }
+      } else {
+        console.error('[LOCAL-STREAM] ❌ localVideoRef.current é null!');
       }
       
       logger.log('✅ Local media initialized');
@@ -323,6 +354,32 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
     try {
       console.log(`[TEST-LOG] 🔥 STEP 2: Creating offer for ${targetUser.name} (${targetUser.id})`);
       
+      // 🚨 CORREÇÃO CRÍTICA: Garantir que o stream local existe antes de criar offer
+      if (!localStreamRef.current) {
+        console.error(`[CRITICAL] ❌ Stream local não disponível! Inicializando...`);
+        try {
+          await initializeLocalMedia();
+          console.log(`[CRITICAL] ✅ Stream local inicializado com sucesso`);
+        } catch (error) {
+          console.error(`[CRITICAL] ❌ Falha ao inicializar stream local:`, error);
+          return;
+        }
+      }
+      
+      // Verificar se o stream tem tracks válidos
+      const tracks = localStreamRef.current?.getTracks() || [];
+      if (tracks.length === 0) {
+        console.error(`[CRITICAL] ❌ Stream local sem tracks! Reinicializando...`);
+        try {
+          await initializeLocalMedia();
+        } catch (error) {
+          console.error(`[CRITICAL] ❌ Falha ao reinicializar stream:`, error);
+          return;
+        }
+      }
+      
+      console.log(`[LOCAL-STREAM] ✅ Stream local verificado: ${tracks.length} tracks`);
+      
       const pc = createPeerConnection(targetUser.id, ''); // socketId will be resolved by backend
       if (!pc) {
         console.error(`[TEST-LOG] ❌ Failed to create peer connection for ${targetUser.id}`);
@@ -389,6 +446,18 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
       if (!data.from) {
         console.error('[TEST-LOG] ❌ Received offer with undefined from field');
         return;
+      }
+
+      // 🚨 CORREÇÃO CRÍTICA: Garantir que o stream local existe antes de processar offer
+      if (!localStreamRef.current) {
+        console.error(`[CRITICAL] ❌ Stream local não disponível ao receber offer! Inicializando...`);
+        try {
+          await initializeLocalMedia();
+          console.log(`[CRITICAL] ✅ Stream local inicializado para processar offer`);
+        } catch (error) {
+          console.error(`[CRITICAL] ❌ Falha ao inicializar stream local para offer:`, error);
+          return;
+        }
       }
 
       // 🚨 CORREÇÃO: Verificar se já existe uma conexão para evitar duplicatas
@@ -961,15 +1030,60 @@ const VideoRoom: React.FC<VideoRoomProps> = ({ userName, roomId, onLeaveRoom }) 
   useEffect(() => {
     const initializeRoom = async () => {
       try {
-        // Initialize media first
-        await initializeLocalMedia();
+        console.log('[INIT] 🚀 Inicializando sala de vídeo...');
+        
+        // Initialize media first with retry
+        let mediaInitialized = false;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (!mediaInitialized && attempts < maxAttempts) {
+          try {
+            attempts++;
+            console.log(`[INIT] 🎥 Tentativa ${attempts}/${maxAttempts} de inicializar mídia...`);
+            await initializeLocalMedia();
+            
+            // Verificar se o stream foi realmente criado
+            if (localStreamRef.current && localStreamRef.current.getTracks().length > 0) {
+              console.log('[INIT] ✅ Mídia local inicializada com sucesso');
+              mediaInitialized = true;
+              
+              // Aguardar um pouco para garantir que o preview carregue
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
+              // Verificar se o preview está funcionando
+              if (localVideoRef.current && localVideoRef.current.srcObject) {
+                console.log('[INIT] ✅ Preview local configurado');
+              } else {
+                console.warn('[INIT] ⚠️ Preview local não configurado, tentando novamente...');
+                if (localVideoRef.current) {
+                  localVideoRef.current.srcObject = localStreamRef.current;
+                }
+              }
+            } else {
+              throw new Error('Stream local não foi criado corretamente');
+            }
+          } catch (error) {
+            console.error(`[INIT] ❌ Tentativa ${attempts} falhou:`, error);
+            if (attempts === maxAttempts) {
+              throw error;
+            }
+            // Aguardar antes da próxima tentativa
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+        
+        if (!mediaInitialized) {
+          throw new Error('Falha ao inicializar mídia após múltiplas tentativas');
+        }
         
         // Initialize socket
+        console.log('[INIT] 🔌 Inicializando socket...');
         initializeSocket();
 
       } catch (error) {
         console.error('❌ Error initializing room:', error);
-        setError('Falha ao inicializar a videochamada');
+        setError('Falha ao inicializar a videochamada. Verifique as permissões de câmera e microfone.');
       }
     };
 
