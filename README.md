@@ -1,31 +1,29 @@
-# Video Chat App - WebRTC (v1.0.0)
+# Video Chat App - WebRTC
 
-Uma aplicação simples de videochamada entre duas pessoas usando WebRTC puro e Socket.IO.
+Uma aplicação simples de videochamada entre duas pessoas usando WebRTC e Socket.IO.
 
-## 🚀 Funcionalidades da v1.0.0
+## 🚀 Funcionalidades
 
 - ✅ Videochamada ponto a ponto entre duas pessoas
 - ✅ Acesso à câmera e microfone
-- ✅ Sistema de salas com Room ID
-- ✅ Sinalização WebRTC via Socket.IO
-- ✅ Troca automática de ofertas, respostas e ICE candidates
-- ✅ Interface React responsiva e moderna
-- ✅ Logs de debugging detalhados
+- ✅ Entrada em sala com Room ID
+- ✅ Conexão WebRTC com Socket.IO
+- ✅ Troca de ofertas, respostas e ICE candidates
+- ✅ Interface responsiva e moderna
 
 ## 🛠️ Tecnologias
 
 ### Frontend
-- React 19 + TypeScript
-- Socket.IO Client 4.8.1
-- WebRTC API nativo
-- Simple-peer para WebRTC
+- React 18 + TypeScript
+- Socket.IO Client
+- WebRTC API
 - CSS3 com design responsivo
 
 ### Backend
-- Node.js + Express 5.1.0
-- Socket.IO Server 4.8.1
-- TypeScript 5.9.2
-- CORS configurado
+- Node.js + Express
+- Socket.IO Server
+- TypeScript
+- CORS configurado para Vercel
 
 ## 📦 Instalação e Execução
 
@@ -123,13 +121,14 @@ O projeto usa servidores STUN públicos do Google:
 - `stun:stun.l.google.com:19302`
 - `stun:stun1.l.google.com:19302`
 
-## 📝 Versão Atual (1.0.0)
+## 📝 Próximos Passos
 
-Esta é uma versão estável e funcional com:
-- WebRTC puro sem dependências externas de transcrição
-- Sistema de salas simples e eficiente
-- Interface limpa e responsiva
-- Código base sólido para futuras expansões
+Após confirmar que a videochamada básica está funcionando, podemos adicionar:
+- Sistema de onboarding
+- Integração com IA para tradução
+- Suporte a mais de 2 usuários
+- Gravação de chamadas
+- Chat de texto
 
 ## 🐛 Troubleshooting
 
@@ -145,4 +144,6 @@ Esta é uma versão estável e funcional com:
 
 3. **Socket.IO não conecta**
    - Verifique a URL do backend
-   - Confirme se o CORS está configurado corretamente# Deploy trigger Sun Aug  3 15:10:28 -03 2025
+   - Confirme se o CORS está configurado corretamente
+
+# Deploy trigger - ICE Timeout Fixes - $(date)
